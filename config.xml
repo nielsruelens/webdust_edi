@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openerp>
+    <data>
+        <record id="clubit_tools_edi_flow_1" model="clubit.tools.edi.flow">
+            <field name="name">Purchase Order(out)</field>
+            <field name="direction">out</field>
+            <field name="model">purchase.order</field>
+            <field name="method">send_edi_out</field>
+            <field name="partner_resolver">edi_partner_resolver</field>
+        </record>
+        <record id="clubit_tools_edi_flow_2" model="clubit.tools.edi.flow">
+            <field name="name">Product Category(out)</field>
+            <field name="direction">out</field>
+            <field name="model">product.category</field>
+            <field name="method">send_edi_out</field>
+            <field name="partner_resolver">edi_partner_resolver</field>
+        </record>
+        <record id="clubit_tools_edi_flow_3" model="clubit.tools.edi.flow">
+            <field name="name">Product(out)</field>
+            <field name="direction">out</field>
+            <field name="model">product.product</field>
+            <field name="method">send_edi_out</field>
+            <field name="partner_resolver">edi_partner_resolver</field>
+        </record>
+        <record id="clubit_tools_edi_flow_4" model="clubit.tools.edi.flow">
+            <field name="name">Pricing(out)</field>
+            <field name="direction">out</field>
+            <field name="model">product.product</field>
+            <field name="method">send_edi_out_pricing</field>
+            <field name="partner_resolver">edi_partner_resolver</field>
+        </record>
+        <record id="webdust_spree" model="res.partner">
+            <field name="name">Spree</field>
+        </record>
+        <menuitem groups="clubit_tools.clubit_tools_edi_user"
+            id="menu_webdust_product" name="Products" parent="clubit_tools.menu_clubit_tools"/>
+        <menuitem action="action_product_upload_thr"
+            groups="clubit_tools.clubit_tools_edi_user"
+            id="menu_product_upload_thr" parent="menu_webdust_product"/>
+        <menuitem action="action_product_download_spree"
+            groups="clubit_tools.clubit_tools_edi_user"
+            id="menu_product_download_spree" parent="menu_webdust_product"/>
+        <menuitem action="action_pricing_download_spree"
+            groups="clubit_tools.clubit_tools_edi_user"
+            id="menu_pricing_download_spree" parent="menu_webdust_product"/>
+        <menuitem action="action_category_download_spree"
+            groups="clubit_tools.clubit_tools_edi_user"
+            id="menu_category_download_spree" parent="menu_webdust_product"/>
+    </data>
+</openerp>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+    <data>
+
+        <record id="view_product_upload_thr" model="ir.ui.view">
+            <field name="name">Products (from THR)</field>
+            <field name="model">product.upload.thr</field>
+            <field name="arch" type="xml">
+                <form string="Upload Parameters" version="7.0">
+                	<group col="2">
+                		<field name="no_of_processes" />
+                		<field name="load_categories" />
+                		<field name="load_properties" />
+                		<field name="load_products" />
+                	</group>
+                    <footer>
+                        <button name="upload_thr" string="Upload" type="object"  class="oe_highlight"  />
+                        or
+                        <button string="Cancel" class="oe_link" special="cancel" />
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+         <act_window name="Products (from THR)"
+            res_model="product.upload.thr"
+            src_model="product.product"
+            view_mode="form"
+            target="new"
+            key2="client_action_multi"
+            id="action_product_upload_thr"/>
+
+    </data>
+</openerp>

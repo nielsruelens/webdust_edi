@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+    <data>
+
+        <record id="view_product_download_spree" model="ir.ui.view">
+            <field name="name">Products (to Spree)</field>
+            <field name="model">product.download.spree</field>
+            <field name="arch" type="xml">
+                <form string="Download Parameters" version="7.0">
+                    <footer>
+                        <button name="download_spree" string="Download" type="object"  class="oe_highlight"  />
+                        or
+                        <button string="Cancel" class="oe_link" special="cancel" />
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+         <act_window name="Products (to Spree)"
+            res_model="product.download.spree"
+            src_model="product.product"
+            view_mode="form"
+            target="new"
+            key2="client_action_multi"
+            id="action_product_download_spree"/>
+
+    </data>
+</openerp>
