@@ -99,6 +99,7 @@ class product(osv.Model):
         for t in threads:
             t.join()
         self.log.info('UPLOAD_THR-PRODUCTS: All threads have finished.')
+        print self.invalid
 
 
 
@@ -125,12 +126,19 @@ class product(osv.Model):
                 self.log.info('UPLOAD_THR-PRODUCTS: processing product with EAN {!s} ({!s} of {!s})'.format(line[1], i, len(content)))
                 existing = next((x for x in all_existing if x.ean13 == line[1]), None)
 
+                # Commit every 200 products
+                # -------------------------
+                if i % 200:
+                    new_cr.commit()
+
+
                 # Creation of a new product
                 # -------------------------
                 if not existing:
 
                     result = self.create_new_product(new_cr, uid,line)
                     if 'rejection' in result:
+                        self.invalid.append(result)
                         self.log.warning('UPLOAD_THR-PRODUCTS: {!s}'.format(result['rejection']))
                         continue
 
