@@ -18,7 +18,7 @@ class product(osv.Model):
     categories = []
 
     header = []
-    invalid = []
+    result = []
 
     thr = False
 
@@ -82,6 +82,13 @@ class product(osv.Model):
                 content[i+1] = line
 
 
+        # Remove THR as the supplier for any products
+        # that aren't mentioned in the file
+        # -------------------------------------------
+        self.remove_obsolete_products(cr, uid, content, context=context)
+        return True
+
+
 
         # Split the actual processing of the content into
         # several threads to hopefully speed up performance
@@ -99,7 +106,8 @@ class product(osv.Model):
         for t in threads:
             t.join()
         self.log.info('UPLOAD_THR-PRODUCTS: All threads have finished.')
-        print self.invalid
+
+
 
 
 
@@ -126,8 +134,9 @@ class product(osv.Model):
                 self.log.info('UPLOAD_THR-PRODUCTS: processing product with EAN {!s} ({!s} of {!s})'.format(line[1], i, len(content)))
                 existing = next((x for x in all_existing if x.ean13 == line[1]), None)
 
-                # Commit every 200 products
-                # -------------------------
+                # Commit every 200 products to make sure
+                # lost work in case of problems is limited
+                # ----------------------------------------
                 if i % 200:
                     new_cr.commit()
 
@@ -136,16 +145,17 @@ class product(osv.Model):
                 # -------------------------
                 if not existing:
 
-                    result = self.create_new_product(new_cr, uid,line)
-                    if 'rejection' in result:
-                        self.invalid.append(result)
-                        self.log.warning('UPLOAD_THR-PRODUCTS: {!s}'.format(result['rejection']))
+                    prod = self.create_new_product(new_cr, uid,line)
+                    self.result.append(prod)
+                    if 'rejection' in prod:
+                        self.log.warning('UPLOAD_THR-PRODUCTS: {!s}'.format(prod['rejection']))
                         continue
 
                 # Updating an existing product
                 # ----------------------------
                 else:
-                    self.update_product(new_cr, uid,line, existing)
+                    prod = self.update_product(new_cr, uid,line, existing)
+                    self.result.append(prod)
 
             new_cr.commit()
         finally:
@@ -294,6 +304,31 @@ class product(osv.Model):
 
 
 
+    def remove_obsolete_products(self, cr, uid, content, context=None):
+
+        self.log.info('UPLOAD_THR-PRODUCTS: Removing supplier information for products THR no longer supplies.')
+
+        supplier_db = self.pool.get('product.supplierinfo')
+
+        # All products mentioned in the file
+        # ----------------------------------
+        current = set([x[0] for x in content])
+
+        # All products currently supplied by THR
+        # --------------------------------------
+        old = supplier_db.search(cr, uid, [('name', '=', self.thr)],context=context)
+        old_total = supplier_db.browse(cr, uid, old, context=context)
+        old = set([x.product_code for x in old_total])
+
+        # These products are no longer supplied
+        # -------------------------------------
+        obsolete = old - current
+
+        # Remove the supplier info
+        # ------------------------
+        old = [x.id for x in old_total if x.product_code in obsolete]
+        supplier_db.unlink(cr, uid, old, context=context)
+        cr.commit()
 
 
 
