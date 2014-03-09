@@ -18,7 +18,7 @@ class product_category(osv.Model):
     log = logging.getLogger(None)
 
 
-    def upload_thr(self, cr, uid, categories, no_of_processes=4, context=None):
+    def upload_thr(self, cr, uid, categories, context=None):
         """
         This method takes in the categories as defined by THR and
         makes sure they exist in OpenERP.

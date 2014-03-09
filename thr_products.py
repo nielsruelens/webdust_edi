@@ -43,7 +43,7 @@ class product(osv.Model):
 
 
 
-    def upload_thr_detail(self, cr, uid, content, no_of_processes=4, context=None):
+    def upload_thr_detail(self, cr, uid, content, no_of_processes=2, context=None):
         """
         This method takes in the header as defined by THR and
         makes sure they exist in OpenERP.

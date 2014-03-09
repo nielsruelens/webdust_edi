@@ -17,7 +17,7 @@ class product_upload_thr(osv.TransientModel):
 
 
     _defaults = {
-      'no_of_processes': lambda *a: 4,
+      'no_of_processes': lambda *a: 2,
       'load_categories': lambda *a: True,
       'load_properties': lambda *a: True,
       'load_products':   lambda *a: True,

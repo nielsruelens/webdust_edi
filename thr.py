@@ -36,7 +36,7 @@ class product(osv.Model):
             for row in reader:
                 content.append(row)
 
-        no_of_processes = 4
+        no_of_processes = 2
         if param and param['no_of_processes'] > 0:
             no_of_processes = param['no_of_processes']
 
