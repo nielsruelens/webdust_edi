@@ -86,7 +86,6 @@ class product(osv.Model):
         # that aren't mentioned in the file
         # -------------------------------------------
         self.remove_obsolete_products(cr, uid, content, context=context)
-        return True
 
 
 
@@ -323,11 +322,14 @@ class product(osv.Model):
         # These products are no longer supplied
         # -------------------------------------
         obsolete = old - current
+        obsolete = [x for x in old_total if x.product_code in obsolete]
 
         # Remove the supplier info
         # ------------------------
-        old = [x.id for x in old_total if x.product_code in obsolete]
-        supplier_db.unlink(cr, uid, old, context=context)
+        for info in obsolete:
+            vals = {'seller_ids' : [(2, info.id,False)]}
+            self.write(cr, uid, [info.product_id.id], vals, context=context)
+
         cr.commit()
 
 
