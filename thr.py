@@ -2,7 +2,7 @@ from openerp.osv import osv
 from openerp.tools.translate import _
 from os.path import join
 from os import path
-import csv
+import csv, json
 import logging
 
 class product(osv.Model):
@@ -18,8 +18,7 @@ class product(osv.Model):
             -------------------------------
             This method reads and returns the content
             of a given file.
-
-        '''
+            ----------------------------------------- '''
         content = []
         self.log.info('UPLOAD_THR: attempting to open file {!s}'.format(f))
         with open(f, 'rb') as csvfile:
@@ -30,6 +29,13 @@ class product(osv.Model):
 
 
     def upload_thr_master_from_file(self, cr, uid, param=None, context=None):
+        ''' product.product:upload_thr_master_from_file()
+        -------------------------------------------------
+        This method handles a THR product import based on a file.
+        It is meant to be called from wizard product_upload_thr.
+        It will create an EDI flow document for all records that
+        went into error.
+        ---------------------------------------------------- '''
 
         self.log.info('UPLOAD_THR: starting the THR masterdata upload from a file.')
 
@@ -47,10 +53,60 @@ class product(osv.Model):
         content = self.read_thr_file(cr, uid, root_path)
         self.upload_thr_master(cr, uid, param, content, context)
 
+        # If errors occurred, they will be stored in attribute self.result
+        # see thr_products.py
+        # ----------------------------------------------------------------
+
+
+
+
+
+    def edi_import_thr(self, cr, uid, ids, context):
+        ''' product.product:edi_import_thr()
+        ------------------------------------
+        This method handles a THR product import document.
+        These documents are generated in case there are any
+        errors in the standard import interface and are used
+        to have an overview of everything that went wrong.
+        ---------------------------------------------------- '''
+
+        # Attempt to validate the file right before processing
+        # ----------------------------------------------------
+        edi_db = self.pool.get('clubit.tools.edi.document.incoming')
+        if not self.edi_import_validator(cr, uid, ids, context):
+            edi_db.message_post(cr, uid, ids, body='Error found: during processing, the document was found invalid.')
+            return False
+
+        # Process the EDI Document
+        # ------------------------
+        document = edi_db.browse(cr, uid, ids, context)
+        data = json.loads(document.content)
+        data = data['message']
+        data['partys'] = data['partys'][0]['party']
+        data['lines'] = data['lines'][0]['line']
+        name = self.create_sale_order(cr, uid, data, context)
+        if not name:
+            edi_db.message_post(cr, uid, ids, body='Error found: something went wrong while creating this set of products.')
+            return False
+        else:
+            edi_db.message_post(cr, uid, ids, body='Sale order {!s} created'.format(name))
+            return True
+
+
+
+
+
+
 
 
 
     def upload_thr_master(self, cr, uid, param=None, content=[], context=None):
+        ''' product.product:upload_thr_master()
+            -----------------------------------
+            This method is the root process node for the
+            THR master data upload. It is called both by
+            the stand-alone upload wizard and the EDI flow.
+            ----------------------------------------------- '''
 
         if not content:
             self.log.info('UPLOAD_THR: masterdata upload complete.')
@@ -78,7 +134,7 @@ class product(osv.Model):
         # --------------------
         if not param or param['load_products']:
             prod_db = self.pool.get('product.product')
-            prod_db.upload_thr_detail(cr, uid, content, no_of_processes=no_of_processes, context=context)
+            prod_db.upload_thr_master_detail(cr, uid, content, no_of_processes=no_of_processes, context=context)
 
         self.log.info('UPLOAD_THR: masterdata upload complete.')
         return True

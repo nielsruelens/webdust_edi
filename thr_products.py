@@ -1,7 +1,5 @@
 from openerp.osv import osv
 from openerp.tools.translate import _
-import copy
-import json
 import logging
 from openerp.addons.product.product import check_ean
 import threading
@@ -25,6 +23,13 @@ class product(osv.Model):
 
 
     def get_all_properties(self, cr, uid):
+        ''' product.product:get_all_properties()
+        ----------------------------------------
+        This method reads all the properties currently
+        defined in the system for fast use during the THR
+        master upload process.
+        ------------------------------------------------- '''
+
         self.log.info('UPLOAD_THR-PRODUCTS: reading all the property masterdata.')
         prop_db = self.pool.get('webdust.property')
         self.properties = prop_db.browse(cr, uid, prop_db.search(cr, uid, []), context=None)
@@ -34,6 +39,13 @@ class product(osv.Model):
         return True
 
     def get_all_categories(self, cr, uid):
+        ''' product.product:get_all_categories()
+        ----------------------------------------
+        This method reads all the categories currently
+        defined in the system for fast use during the THR
+        master upload process.
+        ------------------------------------------------- '''
+
         self.log.info('UPLOAD_THR-PRODUCTS: reading all the category masterdata.')
         cat_db = self.pool.get('product.category')
         self.categories = cat_db.browse(cr, uid, cat_db.search(cr, uid, []), context=None)
@@ -44,12 +56,14 @@ class product(osv.Model):
 
 
 
-    def upload_thr_detail(self, cr, uid, content, no_of_processes=2, context=None):
-        """
-        This method takes in the header as defined by THR and
-        makes sure they exist in OpenERP.
-        """
-
+    def upload_thr_master_detail(self, cr, uid, content, no_of_processes=2, context=None):
+        ''' product.product:upload_thr_master_detail()
+        ----------------------------------------------
+        This method is the heart of the THR master data import.
+        It will loop over all documents, store all global
+        variables and create/update all the products. It will
+        also make sure to split processing in multiple threads.
+        ------------------------------------------------------- '''
 
         self.log.info('UPLOAD_THR-PRODUCTS: starting on the products.')
         self.header = content[0]
@@ -112,6 +126,17 @@ class product(osv.Model):
 
 
     def _content_thread(self, cr, uid, content, context=None):
+        ''' product.product:_content_thread()
+        -------------------------------------
+        This method is called by upload_thr_master_detail()
+        several times in a multi threaded context to speed up
+        processing for several tens of thousand products.
+        Based on the records it receives, it will attempt to
+        create or update a given product. If a product it is
+        given is invalid, it will store it in self.invalid
+        so the upload can be given another shot using the EDI
+        flow.
+        ------------------------------------------------------ '''
 
 
         # Create a new cursor for this thread
@@ -163,7 +188,15 @@ class product(osv.Model):
         return True
 
 
+
+
     def create_new_product(self, cr, uid, line):
+        ''' product.product:create_new_product()
+        ----------------------------------------
+        This method creates a new product in the THR master
+        data upload process.
+        --------------------------------------------------- '''
+
 
         vals = {}
 
@@ -235,6 +268,11 @@ class product(osv.Model):
 
 
     def update_product(self, cr, uid, line, product):
+        ''' product.product:update_product()
+        ------------------------------------
+        This method updates a given product in the THR master
+        data upload process.
+        ----------------------------------------------------- '''
 
         vals = {}
         supplier_db = self.pool.get('product.supplierinfo')
@@ -305,6 +343,14 @@ class product(osv.Model):
 
 
     def remove_obsolete_products(self, cr, uid, content, context=None):
+        ''' product.product:remove_obsolete_products()
+        ----------------------------------------------
+        This method calculates which products are currently
+        listed as being supplied by THR and checks if they're
+        still mentioned in the to-be imported content. If not,
+        it means THR no longer supplies this product and the
+        listing is removed as such.
+        ------------------------------------------------------ '''
 
         self.log.info('UPLOAD_THR-PRODUCTS: Removing supplier information for products THR no longer supplies.')
 
@@ -337,43 +383,6 @@ class product(osv.Model):
 
 
 
-
-
-
-
-
-
-
-    def edi_import_thr(self, cr, uid, ids, context):
-        ''' product.product:edi_import_thr()
-        ------------------------------------
-        This method handles a THR product import document.
-        These documents are generated in case there are any
-        errors in the standard import interface and are used
-        to have an overview of everything that went wrong.
-        ---------------------------------------------------- '''
-
-        # Attempt to validate the file right before processing
-        # ----------------------------------------------------
-        edi_db = self.pool.get('clubit.tools.edi.document.incoming')
-        if not self.edi_import_validator(cr, uid, ids, context):
-            edi_db.message_post(cr, uid, ids, body='Error found: during processing, the document was found invalid.')
-            return False
-
-        # Process the EDI Document
-        # ------------------------
-        document = edi_db.browse(cr, uid, ids, context)
-        data = json.loads(document.content)
-        data = data['message']
-        data['partys'] = data['partys'][0]['party']
-        data['lines'] = data['lines'][0]['line']
-        name = self.create_sale_order(cr, uid, data, context)
-        if not name:
-            edi_db.message_post(cr, uid, ids, body='Error found: something went wrong while creating this set of products.')
-            return False
-        else:
-            edi_db.message_post(cr, uid, ids, body='Sale order {!s} created'.format(name))
-            return True
 
 
 
