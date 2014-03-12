@@ -13,10 +13,25 @@ class product(osv.Model):
 
     log = logging.getLogger(None)
 
+    def read_thr_file(self, cr, uid, f):
+        ''' product.product:read_thr_file()
+            -------------------------------
+            This method reads and returns the content
+            of a given file.
 
-    def upload_thr(self, cr, uid, param=None, context=None):
+        '''
+        content = []
+        self.log.info('UPLOAD_THR: attempting to open file {!s}'.format(f))
+        with open(f, 'rb') as csvfile:
+            reader = csv.reader(csvfile, delimiter=',', quotechar='"')
+            for row in reader:
+                content.append(row)
+        return content
 
-        self.log.info('UPLOAD_THR: starting the THR masterdata upload')
+
+    def upload_thr_master_from_file(self, cr, uid, param=None, context=None):
+
+        self.log.info('UPLOAD_THR: starting the THR masterdata upload from a file.')
 
         # Find the file
         # -------------
@@ -27,14 +42,19 @@ class product(osv.Model):
             return False
         root_path = join(root_path, 'export_pim_handig.csv')
 
-        # Read the file
-        # -------------
-        content = []
-        self.log.info('UPLOAD_THR: attempting to open file {!s}'.format(root_path))
-        with open(root_path, 'rb') as csvfile:
-            reader = csv.reader(csvfile, delimiter=',', quotechar='"')
-            for row in reader:
-                content.append(row)
+        # Read the file and send it for processing
+        # ----------------------------------------
+        content = self.read_thr_file(cr, uid, root_path)
+        self.upload_thr_master(cr, uid, param, content, context)
+
+
+
+
+    def upload_thr_master(self, cr, uid, param=None, content=[], context=None):
+
+        if not content:
+            self.log.info('UPLOAD_THR: masterdata upload complete.')
+            return True
 
         no_of_processes = 2
         if param and param['no_of_processes'] > 0:
@@ -44,7 +64,7 @@ class product(osv.Model):
         # ------------------------------------------
         if not param or param['load_categories']:
             cat_db = self.pool.get('product.category')
-            cat_db.upload_thr(cr, uid, [ x[2:12] for x in content[1:] ], no_of_processes=no_of_processes, context=context)
+            cat_db.upload_thr(cr, uid, [ x[2:12] for x in content[1:] ], context=context)
 
 
         # Process the properties

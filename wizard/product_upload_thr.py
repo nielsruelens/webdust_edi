@@ -24,7 +24,7 @@ class product_upload_thr(osv.TransientModel):
     }
 
 
-    def _upload_thr(self, cr, uid, ids, context=None):
+    def _upload_thr_master(self, cr, uid, ids, context=None):
         prod_db = self.pool.get('product.product')
         new_cr = pooler.get_db(cr.dbname).cursor()
         (uploader,) = self.browse(new_cr, uid, ids, context=context)
@@ -33,11 +33,11 @@ class product_upload_thr(osv.TransientModel):
         param['load_categories'] = uploader.load_categories
         param['load_properties'] = uploader.load_properties
         param['load_products']   = uploader.load_products
-        prod_db.upload_thr(new_cr, uid, param, context=context)
+        prod_db.upload_thr_master_from_file(new_cr, uid, param, context=context)
         new_cr.close()
         return {}
 
-    def upload_thr(self, cr, uid, ids, context=None):
+    def upload_thr_master(self, cr, uid, ids, context=None):
         """
         @param self: The object pointer.
         @param cr: A database cursor
@@ -45,7 +45,16 @@ class product_upload_thr(osv.TransientModel):
         @param ids: List of IDs selected
         @param context: A standard dictionary
         """
-        threaded_calculation = threading.Thread(target=self._upload_thr, args=(cr, uid, ids, context))
+        threaded_calculation = threading.Thread(target=self._upload_thr_master, args=(cr, uid, ids, context))
         threaded_calculation.start()
         return {'type': 'ir.actions.act_window_close'}
+
+
+    def _upload_thr_pricing(self, cr, uid, ids, context=None):
+        return True
+    def upload_thr_pricing(self, cr, uid, ids, context=None):
+        return True
+
+
+
 

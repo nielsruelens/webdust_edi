@@ -1,6 +1,7 @@
 from openerp.osv import osv
 from openerp.tools.translate import _
 import copy
+import json
 import logging
 from openerp.addons.product.product import check_ean
 import threading
@@ -338,6 +339,41 @@ class product(osv.Model):
 
 
 
+
+
+
+
+
+    def edi_import_thr(self, cr, uid, ids, context):
+        ''' product.product:edi_import_thr()
+        ------------------------------------
+        This method handles a THR product import document.
+        These documents are generated in case there are any
+        errors in the standard import interface and are used
+        to have an overview of everything that went wrong.
+        ---------------------------------------------------- '''
+
+        # Attempt to validate the file right before processing
+        # ----------------------------------------------------
+        edi_db = self.pool.get('clubit.tools.edi.document.incoming')
+        if not self.edi_import_validator(cr, uid, ids, context):
+            edi_db.message_post(cr, uid, ids, body='Error found: during processing, the document was found invalid.')
+            return False
+
+        # Process the EDI Document
+        # ------------------------
+        document = edi_db.browse(cr, uid, ids, context)
+        data = json.loads(document.content)
+        data = data['message']
+        data['partys'] = data['partys'][0]['party']
+        data['lines'] = data['lines'][0]['line']
+        name = self.create_sale_order(cr, uid, data, context)
+        if not name:
+            edi_db.message_post(cr, uid, ids, body='Error found: something went wrong while creating this set of products.')
+            return False
+        else:
+            edi_db.message_post(cr, uid, ids, body='Sale order {!s} created'.format(name))
+            return True
 
 
 
