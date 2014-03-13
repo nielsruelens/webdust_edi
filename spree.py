@@ -106,11 +106,13 @@ class product_product(osv.Model):
         content = []
         for product in products:
             vals = { 'id': product.id, 'name':product.name, 'ean': product.ean13,
-                     'category': product.categ_id.code, 'properties':[],
+                     'category': product.categ_id.code, 'properties':[], 'images':[],
                      'recommended_price':product.recommended_price,
                      'long_description':product.description_sale, 'short_description':product.short_description}
             for property in product.properties:
                 vals['properties'].append({'id':property.name.id, 'name':property.name.name, 'value':property.value})
+            for image in product.images:
+                vals['images'].append({'supplier':image.supplier.id, 'url':image.url})
             content.append(vals)
 
 
