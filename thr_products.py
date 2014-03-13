@@ -17,10 +17,22 @@ class product(osv.Model):
     categories = []
 
     header = []
-    result = []
+    invalid = []
 
     thr = False
 
+
+    def clear_globals(self, cr, uid):
+        ''' product.product:clear_globals()
+        -----------------------------------
+        This method clears all the global attributes
+        required for the THR upload.
+        -------------------------------------------- '''
+        self.properties = []
+        self.categories = []
+        self.header = []
+        self.invalid = []
+        self.thr = False
 
     def get_all_properties(self, cr, uid):
         ''' product.product:get_all_properties()
@@ -56,7 +68,7 @@ class product(osv.Model):
 
 
 
-    def upload_thr_master_detail(self, cr, uid, content, no_of_processes=2, context=None):
+    def upload_thr_master_detail(self, cr, uid, content, no_of_processes=2,do_supplier_removal=True, context=None):
         ''' product.product:upload_thr_master_detail()
         ----------------------------------------------
         This method is the heart of the THR master data import.
@@ -97,10 +109,13 @@ class product(osv.Model):
                 content[i+1] = line
 
 
-        # Remove THR as the supplier for any products
-        # that aren't mentioned in the file
-        # -------------------------------------------
-        self.remove_obsolete_products(cr, uid, content, context=context)
+        # Remove THR as the supplier for any products that aren't mentioned
+        # in the file. The reason this step is optional is due to the fact
+        # that we're also processing this method using the EDI flow, in which case
+        # the file will be practically empty and we don't want to accidentally delete all data!
+        # -------------------------------------------------------------------------------------
+        if do_supplier_removal:
+            self.remove_obsolete_products(cr, uid, content, context=context)
 
 
 
@@ -156,13 +171,18 @@ class product(osv.Model):
             # ------------------------
             for i, line in enumerate(content):
                 i = i + 1
+
+                if i == 10:
+                    new_cr.commit()
+                    return True
+
                 self.log.info('UPLOAD_THR-PRODUCTS: processing product with EAN {!s} ({!s} of {!s})'.format(line[1], i, len(content)))
                 existing = next((x for x in all_existing if x.ean13 == line[1]), None)
 
                 # Commit every 200 products to make sure
                 # lost work in case of problems is limited
                 # ----------------------------------------
-                if i % 200:
+                if i % 200 == 0:
                     new_cr.commit()
 
 
@@ -171,16 +191,14 @@ class product(osv.Model):
                 if not existing:
 
                     prod = self.create_new_product(new_cr, uid,line)
-                    self.result.append(prod)
                     if 'rejection' in prod:
+                        self.invalid.append(line)
                         self.log.warning('UPLOAD_THR-PRODUCTS: {!s}'.format(prod['rejection']))
-                        continue
 
                 # Updating an existing product
                 # ----------------------------
                 else:
-                    prod = self.update_product(new_cr, uid,line, existing)
-                    self.result.append(prod)
+                    self.update_product(new_cr, uid,line, existing)
 
             new_cr.commit()
         finally:

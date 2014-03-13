@@ -10,11 +10,17 @@ class product_download_spree(osv.TransientModel):
         ''' product.download.spree:download_spree()
             ---------------------------------------
             Downloads all products that have changed
-            in the last 24 hours.
-            ---------------------------------------- '''
+            in the last 24 hours OR whichever products
+            are currently manually selected.
+            ------------------------------------------ '''
+
         prod_db = self.pool.get('product.product')
-        now = datetime.datetime.now()
-        products = prod_db.search(cr, uid, [('write_date', '>=', now.strftime("%Y-%m-%d") )])
-        products = prod_db.edi_partner_resolver(cr, uid, products, context)
-        prod_db.send_edi_out(cr, uid, products, context=context)
+
+        active_ids = context.get('active_ids')
+        if not active_ids:
+            now = datetime.datetime.now()
+            active_ids = prod_db.search(cr, uid, [('write_date', '>=', now.strftime("%Y-%m-%d") )])
+
+        active_ids = prod_db.edi_partner_resolver(cr, uid, active_ids, context)
+        prod_db.send_edi_out(cr, uid, active_ids, context=context)
         return {'type': 'ir.actions.act_window_close'}

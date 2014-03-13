@@ -2,7 +2,7 @@ from openerp.osv import osv
 from openerp.tools.translate import _
 from os.path import join
 from os import path
-import csv, json
+import csv, json, StringIO
 import logging
 
 class product(osv.Model):
@@ -12,6 +12,19 @@ class product(osv.Model):
     _description = "Product extensions"
 
     log = logging.getLogger(None)
+
+
+    def read_thr_master_flow_id(self, cr, uid):
+        ''' product.product:read_thr_master_flow_id()
+            -----------------------------------------
+            This method reads and returns the flow id
+            for the reimport EDI flow (masterdata THR).
+            ------------------------------------------- '''
+        model_db = self.pool.get('ir.model.data')
+        (flow_id,) = model_db.search(cr, uid,[('name','=','clubit_tools_edi_flow_5')])
+        flow = model_db.browse(cr, uid, flow_id)
+        return flow.res_id
+
 
     def read_thr_file(self, cr, uid, f):
         ''' product.product:read_thr_file()
@@ -28,6 +41,7 @@ class product(osv.Model):
         return content
 
 
+
     def upload_thr_master_from_file(self, cr, uid, param=None, context=None):
         ''' product.product:upload_thr_master_from_file()
         -------------------------------------------------
@@ -36,8 +50,6 @@ class product(osv.Model):
         It will create an EDI flow document for all records that
         went into error.
         ---------------------------------------------------- '''
-
-        self.log.info('UPLOAD_THR: starting the THR masterdata upload from a file.')
 
         # Find the file
         # -------------
@@ -51,12 +63,24 @@ class product(osv.Model):
         # Read the file and send it for processing
         # ----------------------------------------
         content = self.read_thr_file(cr, uid, root_path)
+
+        param['do_supplier_removal'] = False
         self.upload_thr_master(cr, uid, param, content, context)
 
         # If errors occurred, they will be stored in attribute self.result
         # see thr_products.py
         # ----------------------------------------------------------------
+        if self.invalid:
+            self.log.info('UPLOAD_THR: Errors occurred during masterdata upload, performing cleanup.')
+            self.invalid.insert(0, self.header) #add the header line to this list
+            flow_id = self.read_thr_master_flow_id(cr, uid)
+            edi_db = self.pool.get('clubit.tools.edi.document')
+            self.log.info('UPLOAD_THR: Creating EDI document to hold erroneous lines.')
+            edi_db.position_document(cr, uid, self.thr, flow_id, self.invalid, content_type='csv')
+            self.log.info('UPLOAD_THR: Cleanup done.')
 
+        cr.commit()
+        return True
 
 
 
@@ -70,27 +94,24 @@ class product(osv.Model):
         to have an overview of everything that went wrong.
         ---------------------------------------------------- '''
 
-        # Attempt to validate the file right before processing
-        # ----------------------------------------------------
-        edi_db = self.pool.get('clubit.tools.edi.document.incoming')
-        if not self.edi_import_validator(cr, uid, ids, context):
-            edi_db.message_post(cr, uid, ids, body='Error found: during processing, the document was found invalid.')
-            return False
-
         # Process the EDI Document
         # ------------------------
+        edi_db = self.pool.get('clubit.tools.edi.document.incoming')
         document = edi_db.browse(cr, uid, ids, context)
-        data = json.loads(document.content)
-        data = data['message']
-        data['partys'] = data['partys'][0]['party']
-        data['lines'] = data['lines'][0]['line']
-        name = self.create_sale_order(cr, uid, data, context)
-        if not name:
-            edi_db.message_post(cr, uid, ids, body='Error found: something went wrong while creating this set of products.')
+
+        content = []
+        dummy_file = StringIO.StringIO(document.content)
+        reader = csv.reader(dummy_file, delimiter=',', quotechar='"')
+        for row in reader:
+            content.append(row)
+
+        param = {'do_supplier_removal':False, 'no_of_processes':1, 'load_categories':True, 'load_properties':True, 'load_products':True}
+        self.upload_thr_master(cr, uid, param, content, context)
+        if self.invalid:
+            edi_db.message_post(cr, uid, ids, body='Error found: something went wrong while creating this set of products, check the server log.')
             return False
-        else:
-            edi_db.message_post(cr, uid, ids, body='Sale order {!s} created'.format(name))
-            return True
+
+        return True
 
 
 
@@ -108,6 +129,7 @@ class product(osv.Model):
             the stand-alone upload wizard and the EDI flow.
             ----------------------------------------------- '''
 
+        self.clear_globals(cr, uid)
         if not content:
             self.log.info('UPLOAD_THR: masterdata upload complete.')
             return True
@@ -115,6 +137,12 @@ class product(osv.Model):
         no_of_processes = 2
         if param and param['no_of_processes'] > 0:
             no_of_processes = param['no_of_processes']
+
+
+        do_supplier_removal = True
+        if param and 'do_supplier_removal' in param:
+            do_supplier_removal = param['do_supplier_removal']
+
 
         # Process the categories, exclude the header
         # ------------------------------------------
@@ -134,7 +162,7 @@ class product(osv.Model):
         # --------------------
         if not param or param['load_products']:
             prod_db = self.pool.get('product.product')
-            prod_db.upload_thr_master_detail(cr, uid, content, no_of_processes=no_of_processes, context=context)
+            prod_db.upload_thr_master_detail(cr, uid, content, no_of_processes=no_of_processes, do_supplier_removal=do_supplier_removal, context=context)
 
         self.log.info('UPLOAD_THR: masterdata upload complete.')
         return True
