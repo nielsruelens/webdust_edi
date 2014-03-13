@@ -259,7 +259,16 @@ class product(osv.Model):
         supplier['product_code'] = line[0]
         vals['seller_ids'] =  [(0, False, supplier)]
 
+        # Images
+        # ------
+        vals['images'] = []
+        for image in line[14:24]:
+            if image:
+                vals['images'].append([0,False,{'supplier' : self.thr, 'url':image}])
+
+
         # Properties
+        # ----------
         vals['properties'] = []
         for i, prop in enumerate(line):
             if i < 24 or not prop:
@@ -295,6 +304,7 @@ class product(osv.Model):
         vals = {}
         supplier_db = self.pool.get('product.supplierinfo')
         prop_db = self.pool.get('webdust.product.property')
+        image_db = self.pool.get('webdust.image')
 
 
         vals['name'] = ' '.join((line[41], line[40], line[42]))
@@ -332,7 +342,19 @@ class product(osv.Model):
             if seller.product_code != line[0]:
                 supplier_db.write(cr, uid, seller.id, {'product_code' : line[0]}, context=None)
 
+        # Images
+        # ------
+        image_ids = image_db.search(cr, uid, [('product_id','=',product.id),('supplier','=',self.thr)])
+        if image_ids: image_db.unlink(cr, uid, image_ids)
+        vals['images'] = []
+        for image in line[14:24]:
+            if image:
+                vals['images'].append([0,False,{'supplier' : self.thr, 'url':image}])
+
+
+
         # Properties
+        # ----------
         vals['properties'] = []
         for i, prop in enumerate(line):
             if i < 24 or not prop:

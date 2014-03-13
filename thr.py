@@ -64,7 +64,7 @@ class product(osv.Model):
         # ----------------------------------------
         content = self.read_thr_file(cr, uid, root_path)
 
-        param['do_supplier_removal'] = False
+        param['do_supplier_removal'] = True
         self.upload_thr_master(cr, uid, param, content, context)
 
         # If errors occurred, they will be stored in attribute self.result
