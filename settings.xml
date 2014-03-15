@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openerp>
+    <data>
+        <record id="webdust_edi_settings_tree" model="ir.ui.view">
+            <field name="name">webdust.edi.settings.tree</field>
+            <field name="model">webdust.edi.settings</field>
+            <field name="priority">1</field>
+            <field name="arch" type="xml">
+                <tree delete="false" string="EDI Settings">
+                    <field name="no_of_processes"/>
+                    <field name="sale_high_tax_id"/>
+                    <field name="sale_low_tax_id"/>
+                    <field name="purchase_high_tax_id"/>
+                    <field name="purchase_low_tax_id"/>
+                </tree>
+            </field>
+        </record>
+        <record id="action_edi_settings" model="ir.actions.act_window">
+            <field name="name">EDI Settings</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">webdust.edi.settings</field>
+            <field name="view_type">form</field>
+            <field name="view_mode">tree,form</field>
+            <field name="context">{}</field>
+        </record>
+        <menuitem action="action_edi_settings"
+            groups="clubit_tools.clubit_tools_edi_user"
+            id="menu_webdust_edi_settings" name="Settings" parent="clubit_tools.menu_clubit_tools_config"/>
+        <record id="webdust_edi_settings_form" model="ir.ui.view">
+            <field name="name">webdust.edi.settings.form</field>
+            <field name="model">webdust.edi.settings</field>
+            <field name="arch" type="xml">
+                <form create="false" duplicate="false"
+                    string="EDI Settings" version="7.0">
+                    <separator string="Multithreading"/>
+                    <group>
+                        <field name="no_of_processes"/>
+                    </group>
+                    <separator string="Taxes"/>
+                    <group>
+                        <field name="sale_high_tax_id"/>
+                        <field name="sale_low_tax_id"/>
+                        <field name="purchase_high_tax_id"/>
+                        <field name="purchase_low_tax_id"/>
+                    </group>
+                </form>
+            </field>
+        </record>
+    </data>
+</openerp>

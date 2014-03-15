@@ -21,6 +21,7 @@
         'purchase_view.xml',
         'category_view.xml',
         'config.xml',
+        'settings.xml',
         'wizard/clubit_tools_edi_wizard_outgoing_purchase.xml',
         'wizard/clubit_tools_edi_wizard_outgoing_category.xml',
         'wizard/clubit_tools_edi_wizard_outgoing_product.xml',

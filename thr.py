@@ -12,6 +12,13 @@ class product(osv.Model):
     _description = "Product extensions"
 
     log = logging.getLogger(None)
+    thr = False
+    settings = False
+
+
+    def read_thr_partner(self, cr, uid):
+        (self.thr,) = self.pool.get('res.partner').search(cr, uid, [('name', '=', 'THR')])
+
 
 
     def read_thr_master_flow_id(self, cr, uid):

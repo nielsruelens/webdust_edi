@@ -36,7 +36,12 @@
 			<field name="model">product.product</field>
 			<field name="method">edi_import_thr</field>
 		</record>
-
+		<record id="clubit_tools_edi_flow_6" model="clubit.tools.edi.flow">
+			<field name="name">Pricing(in)</field>
+			<field name="direction">in</field>
+			<field name="model">product.product</field>
+			<field name="method">edi_import_pricing</field>
+		</record>
 
         <record id="webdust_spree" model="res.partner">
             <field name="name">Spree</field>

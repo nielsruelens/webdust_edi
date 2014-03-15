@@ -19,8 +19,6 @@ class product(osv.Model):
     header = []
     invalid = []
 
-    thr = False
-
 
     def clear_globals(self, cr, uid):
         ''' product.product:clear_globals()
@@ -32,7 +30,6 @@ class product(osv.Model):
         self.categories = []
         self.header = []
         self.invalid = []
-        self.thr = False
 
     def get_all_properties(self, cr, uid):
         ''' product.product:get_all_properties()
@@ -84,7 +81,7 @@ class product(osv.Model):
         # Search THR as a partner
         # -----------------------
         self.log.info('UPLOAD_THR-PRODUCTS: searching for THR as a partner.')
-        (self.thr,) = self.pool.get('res.partner').search(cr, uid, [('name', '=', 'THR')],context=context)
+        self.read_thr_partner(cr, uid)
         if not self.thr:
             self.log.error('UPLOAD_THR-PRODUCTS: could not find partner THR, aborting process.')
             return True
@@ -114,8 +111,8 @@ class product(osv.Model):
         # that we're also processing this method using the EDI flow, in which case
         # the file will be practically empty and we don't want to accidentally delete all data!
         # -------------------------------------------------------------------------------------
-        if do_supplier_removal:
-            self.remove_obsolete_products(cr, uid, content, context=context)
+        #if do_supplier_removal:
+        #    self.remove_obsolete_products(cr, uid, content, context=context)
 
 
 
@@ -127,7 +124,7 @@ class product(osv.Model):
             start = len(content) / no_of_processes * i
             end = len(content) / no_of_processes * (i+1)
             if i+1 == no_of_processes: end = len(content)
-            t = threading.Thread(target=self._content_thread, args=(cr, uid, content[start:end], context))
+            t = threading.Thread(target=self._content_thread_master, args=(cr, uid, content[start:end], context))
             threads.append(t)
             t.start()
 
@@ -140,9 +137,9 @@ class product(osv.Model):
 
 
 
-    def _content_thread(self, cr, uid, content, context=None):
-        ''' product.product:_content_thread()
-        -------------------------------------
+    def _content_thread_master(self, cr, uid, content, context=None):
+        ''' product.product:_content_thread_master()
+        --------------------------------------------
         This method is called by upload_thr_master_detail()
         several times in a multi threaded context to speed up
         processing for several tens of thousand products.
