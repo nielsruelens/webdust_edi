@@ -169,9 +169,9 @@ class product(osv.Model):
             for i, line in enumerate(content):
                 i = i + 1
 
-                if i == 10:
-                    new_cr.commit()
-                    return True
+                #if i == 10:
+                #    new_cr.commit()
+                #    return True
 
                 self.log.info('UPLOAD_THR-PRODUCTS: processing product with EAN {!s} ({!s} of {!s})'.format(line[1], i, len(content)))
                 existing = next((x for x in all_existing if x.ean13 == line[1]), None)

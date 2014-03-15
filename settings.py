@@ -29,6 +29,7 @@ class webdust_edi_settings(osv.Model):
     def create(self, cr, uid, vals, context=None):
         if self.search(cr, uid, []):
             raise osv.except_osv(_('Error!'), _("Only 1 settings record allowed."))
+        return super(webdust_edi_settings, self).create(cr, uid, vals, context)
 
     def get_settings(self, cr, uid):
         ids = self.search(cr, uid, [])
