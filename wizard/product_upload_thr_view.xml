@@ -8,7 +8,6 @@
             <field name="arch" type="xml">
                 <form string="Upload Parameters" version="7.0">
                 	<group col="2">
-                		<field name="no_of_processes" />
                 		<field name="load_categories" />
                 		<field name="load_properties" />
                 		<field name="load_products" />

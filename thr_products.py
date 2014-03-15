@@ -65,7 +65,7 @@ class product(osv.Model):
 
 
 
-    def upload_thr_master_detail(self, cr, uid, content, no_of_processes=2,do_supplier_removal=True, context=None):
+    def upload_thr_master_detail(self, cr, uid, content, context=None):
         ''' product.product:upload_thr_master_detail()
         ----------------------------------------------
         This method is the heart of the THR master data import.
@@ -120,10 +120,10 @@ class product(osv.Model):
         # several threads to hopefully speed up performance
         # -------------------------------------------------
         threads = []
-        for i in xrange(no_of_processes):
-            start = len(content) / no_of_processes * i
-            end = len(content) / no_of_processes * (i+1)
-            if i+1 == no_of_processes: end = len(content)
+        for i in xrange(self.settings.no_of_processes):
+            start = len(content) / self.settings.no_of_processes * i
+            end = len(content) / self.settings.no_of_processes * (i+1)
+            if i+1 == self.settings.no_of_processes: end = len(content)
             t = threading.Thread(target=self._content_thread_master, args=(cr, uid, content[start:end], context))
             threads.append(t)
             t.start()
@@ -387,6 +387,9 @@ class product(osv.Model):
         still mentioned in the to-be imported content. If not,
         it means THR no longer supplies this product and the
         listing is removed as such.
+
+
+        !!! Method currently isn't used!!!!!!
         ------------------------------------------------------ '''
 
         self.log.info('UPLOAD_THR-PRODUCTS: Removing supplier information for products THR no longer supplies.')

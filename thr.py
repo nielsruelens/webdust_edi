@@ -70,8 +70,6 @@ class product(osv.Model):
         # Read the file and send it for processing
         # ----------------------------------------
         content = self.read_thr_file(cr, uid, root_path)
-
-        param['do_supplier_removal'] = True
         self.upload_thr_master(cr, uid, param, content, context)
 
         # If errors occurred, they will be stored in attribute self.result
@@ -112,7 +110,7 @@ class product(osv.Model):
         for row in reader:
             content.append(row)
 
-        param = {'do_supplier_removal':False, 'no_of_processes':1, 'load_categories':True, 'load_properties':True, 'load_products':True}
+        param = {'load_categories':True, 'load_properties':True, 'load_products':True}
         self.upload_thr_master(cr, uid, param, content, context)
         if self.invalid:
             edi_db.message_post(cr, uid, ids, body='Error found: something went wrong while creating this set of products, check the server log.')
@@ -141,15 +139,10 @@ class product(osv.Model):
             self.log.info('UPLOAD_THR: masterdata upload complete.')
             return True
 
-        no_of_processes = 2
-        if param and param['no_of_processes'] > 0:
-            no_of_processes = param['no_of_processes']
-
-
-        do_supplier_removal = True
-        if param and 'do_supplier_removal' in param:
-            do_supplier_removal = param['do_supplier_removal']
-
+        self.settings = self.pool.get('webdust.edi.settings').get_settings(cr, uid)
+        if not self.settings:
+            self.log.warning('UPLOAD_THR: could not load EDI settings, aborting process.')
+            return True
 
         # Process the categories, exclude the header
         # ------------------------------------------
@@ -169,7 +162,7 @@ class product(osv.Model):
         # --------------------
         if not param or param['load_products']:
             prod_db = self.pool.get('product.product')
-            prod_db.upload_thr_master_detail(cr, uid, content, no_of_processes=no_of_processes, do_supplier_removal=do_supplier_removal, context=context)
+            prod_db.upload_thr_master_detail(cr, uid, content, context=context)
 
         self.log.info('UPLOAD_THR: masterdata upload complete.')
         return True

@@ -9,7 +9,6 @@ class product_upload_thr(osv.TransientModel):
 
 
     _columns = {
-        'no_of_processes' : fields.integer('Amount of processes', required=True),
         'load_categories' : fields.boolean('Load categories'),
         'load_properties' : fields.boolean('Load properties'),
         'load_products' : fields.boolean('Load products'),
@@ -17,7 +16,6 @@ class product_upload_thr(osv.TransientModel):
 
 
     _defaults = {
-      'no_of_processes': lambda *a: 2,
       'load_categories': lambda *a: True,
       'load_properties': lambda *a: True,
       'load_products':   lambda *a: True,
@@ -29,7 +27,6 @@ class product_upload_thr(osv.TransientModel):
         new_cr = pooler.get_db(cr.dbname).cursor()
         (uploader,) = self.browse(new_cr, uid, ids, context=context)
         param = {}
-        param['no_of_processes'] = uploader.no_of_processes
         param['load_categories'] = uploader.load_categories
         param['load_properties'] = uploader.load_properties
         param['load_products']   = uploader.load_products
