@@ -113,7 +113,6 @@ class product(osv.Model):
             for i, line in enumerate(content):
                 i = i + 1
 
-
                 # Make sure the product actually exists in OpenERP
                 # ------------------------------------------------
                 self.log.info('UPLOAD-PRICING: processing product with EAN {!s} ({!s} of {!s})'.format(line[0], i, len(content)))

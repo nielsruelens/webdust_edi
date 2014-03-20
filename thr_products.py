@@ -279,7 +279,7 @@ class product(osv.Model):
 
 
         vals['short_description'] = line[12]
-        vals['description_sale'] = line[13]
+        vals['description'] = line[13]
         vals['procure_method'] = 'make_to_order'
         vals['type'] = 'product'
         vals['state'] = 'draft'
@@ -373,7 +373,7 @@ class product(osv.Model):
 
 
         vals['short_description'] = line[12]
-        vals['description_sale'] = line[13]
+        vals['description'] = line[13]
         vals['recommended_price'] = line[24]
         return {'id' : self.write(cr, uid, [product.id], vals, context=None)}
 
