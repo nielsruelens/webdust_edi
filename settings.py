@@ -12,6 +12,10 @@ class webdust_edi_settings(osv.Model):
         'sale_low_tax_id': fields.many2one('account.tax', 'Sale Low Tax', required=True),
         'purchase_high_tax_id': fields.many2one('account.tax', 'Purchase High Tax', required=True),
         'purchase_low_tax_id': fields.many2one('account.tax', 'Purchase Low Tax', required=True),
+        'spree_url': fields.char('Address', size=256, required=True),
+        'spree_port': fields.integer('Port', required=True),
+        'spree_user': fields.char('User', size=50, required=True),
+        'spree_pass': fields.char('Password', size=100, required=True, password=True),
     }
 
 

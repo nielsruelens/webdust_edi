@@ -43,6 +43,13 @@
                         <field name="purchase_high_tax_id" domain="[('type_tax_use','=','purchase')]"/>
                         <field name="purchase_low_tax_id" domain="[('type_tax_use','=','purchase')]"/>
                     </group>
+                    <separator string="Spree"/>
+                    <group>
+                        <field name="spree_url"/>
+                        <field name="spree_port"/>
+                        <field name="spree_user"/>
+                        <field name="spree_pass" password="True"/>
+                    </group>
                 </form>
             </field>
         </record>
