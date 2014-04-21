@@ -1,8 +1,3 @@
-import clubit_tools_edi_wizard_outgoing_purchase
-import clubit_tools_edi_wizard_outgoing_category
-import clubit_tools_edi_wizard_outgoing_product
-import clubit_tools_edi_wizard_outgoing_pricing
-import product_upload_thr
-import category_download_spree
-import product_download_spree
-import pricing_download_spree
+import out_purchase_order
+import thr_masterdata
+import thr_product_combined

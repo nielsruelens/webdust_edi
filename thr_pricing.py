@@ -113,7 +113,6 @@ class product(osv.Model):
             for i, line in enumerate(content):
                 i = i + 1
 
-
                 # Make sure the product actually exists in OpenERP
                 # ------------------------------------------------
                 self.log.info('UPLOAD-PRICING: processing product with EAN {!s} ({!s} of {!s})'.format(line[0], i, len(content)))
@@ -179,7 +178,6 @@ class product(osv.Model):
 
 
                 vals = { 'taxes_id': [[6, False, tax1]], 'supplier_taxes_id': [[6, False, tax2]],  'seller_ids': [[1, seller.id, {'pricelist_ids': new_price }]]}
-                #vals = { 'seller_ids': [[1, seller.id, {'pricelist_ids': new_price }]]}
                 self.write(new_cr, uid, [product.id], vals, context=None)
 
             new_cr.commit()

@@ -8,57 +8,48 @@
             <field name="method">send_edi_out</field>
             <field name="partner_resolver">edi_partner_resolver</field>
         </record>
-        <record id="clubit_tools_edi_flow_2" model="clubit.tools.edi.flow">
-            <field name="name">Product Category(out)</field>
-            <field name="direction">out</field>
-            <field name="model">product.category</field>
-            <field name="method">send_edi_out</field>
-            <field name="partner_resolver">edi_partner_resolver</field>
-        </record>
-        <record id="clubit_tools_edi_flow_3" model="clubit.tools.edi.flow">
-            <field name="name">Product(out)</field>
-            <field name="direction">out</field>
-            <field name="model">product.product</field>
-            <field name="method">send_edi_out</field>
-            <field name="partner_resolver">edi_partner_resolver</field>
-        </record>
-        <record id="clubit_tools_edi_flow_4" model="clubit.tools.edi.flow">
-            <field name="name">Pricing(out)</field>
-            <field name="direction">out</field>
-            <field name="model">product.product</field>
-            <field name="method">send_edi_out_pricing</field>
-            <field name="partner_resolver">edi_partner_resolver</field>
-        </record>
 
-		<record id="clubit_tools_edi_flow_5" model="clubit.tools.edi.flow">
+		<record id="edi_thr_product_master_in" model="clubit.tools.edi.flow">
 			<field name="name">Product(in)</field>
 			<field name="direction">in</field>
 			<field name="model">product.product</field>
 			<field name="method">edi_import_thr</field>
 		</record>
-		<record id="clubit_tools_edi_flow_6" model="clubit.tools.edi.flow">
+		<record id="edi_thr_product_pricing_in" model="clubit.tools.edi.flow">
 			<field name="name">Pricing(in)</field>
 			<field name="direction">in</field>
 			<field name="model">product.product</field>
 			<field name="method">edi_import_pricing</field>
 		</record>
+		<record id="edi_thr_product_availability_in" model="clubit.tools.edi.flow">
+			<field name="name">Availability(in)</field>
+			<field name="direction">in</field>
+			<field name="model">product.product</field>
+			<field name="method">edi_import_availability</field>
+		</record>
 
-        <record id="webdust_spree" model="res.partner">
-            <field name="name">Spree</field>
+        <record id="webdust_handig_nl" model="res.partner">
+            <field name="name">Handig.nl</field>
+        </record>
+        <record id="webdust_handig_be" model="res.partner">
+            <field name="name">Handig.be</field>
         </record>
         <menuitem groups="clubit_tools.clubit_tools_edi_user"
             id="menu_webdust_product" name="Products" parent="clubit_tools.menu_clubit_tools"/>
-        <menuitem action="action_product_upload_thr"
+        <menuitem action="action_thr_product_combined"
             groups="clubit_tools.clubit_tools_edi_user"
-            id="menu_product_upload_thr" parent="menu_webdust_product"/>
-        <menuitem action="action_product_download_spree"
+            id="menu_thr_product_combined" parent="menu_webdust_product"/>
+        <menuitem action="action_thr_masterdata"
             groups="clubit_tools.clubit_tools_edi_user"
-            id="menu_product_download_spree" parent="menu_webdust_product"/>
-        <menuitem action="action_pricing_download_spree"
+            id="menu_thr_masterdata" parent="menu_webdust_product"/>
+        <menuitem action="action_spree_masterdata"
             groups="clubit_tools.clubit_tools_edi_user"
-            id="menu_pricing_download_spree" parent="menu_webdust_product"/>
-        <menuitem action="action_category_download_spree"
+            id="menu_spree_masterdata" parent="menu_webdust_product"/>
+        <menuitem action="action_spree_pricing"
             groups="clubit_tools.clubit_tools_edi_user"
-            id="menu_category_download_spree" parent="menu_webdust_product"/>
+            id="menu_spree_pricing" parent="menu_webdust_product"/>
+        <menuitem action="action_spree_category"
+            groups="clubit_tools.clubit_tools_edi_user"
+            id="menu_spree_category" parent="menu_webdust_product"/>
     </data>
 </openerp>

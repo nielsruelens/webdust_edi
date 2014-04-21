@@ -2,18 +2,13 @@
 <openerp>
     <data>
 
-        <record id="view_product_upload_thr" model="ir.ui.view">
+        <record id="view_thr_product_combined" model="ir.ui.view">
             <field name="name">Products (from THR)</field>
-            <field name="model">product.upload.thr</field>
+            <field name="model">thr.product.combined</field>
             <field name="arch" type="xml">
-                <form string="Upload Parameters" version="7.0">
-                	<group col="2">
-                		<field name="load_categories" />
-                		<field name="load_properties" />
-                		<field name="load_products" />
-                	</group>
+                <form string="Products from THR" version="7.0">
                     <footer>
-                        <button name="upload_thr_master" string="Upload" type="object"  class="oe_highlight"  />
+                        <button name="start" string="Start" type="object"  class="oe_highlight"  />
                         or
                         <button string="Cancel" class="oe_link" special="cancel" />
                     </footer>
@@ -22,12 +17,12 @@
         </record>
 
          <act_window name="Products (from THR)"
-            res_model="product.upload.thr"
+            res_model="thr.product.combined"
             src_model="product.product"
             view_mode="form"
             target="new"
             key2="client_action_multi"
-            id="action_product_upload_thr"/>
+            id="action_thr_product_combined"/>
 
     </data>
 </openerp>

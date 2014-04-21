@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+    <data>
+
+        <record id="view_thr_masterdata" model="ir.ui.view">
+            <field name="name">Masterdata (from THR)</field>
+            <field name="model">thr.masterdata</field>
+            <field name="arch" type="xml">
+                <form string="Upload Parameters" version="7.0">
+                	<group col="2">
+                		<field name="load_categories" />
+                		<field name="load_properties" />
+                		<field name="load_products" />
+                	</group>
+                    <footer>
+                        <button name="start" string="Upload" type="object"  class="oe_highlight"  />
+                        or
+                        <button string="Cancel" class="oe_link" special="cancel" />
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+         <act_window name="Masterdata (from THR)"
+            res_model="thr.masterdata"
+            src_model="product.product"
+            view_mode="form"
+            target="new"
+            key2="client_action_multi"
+            id="action_thr_masterdata"/>
+
+    </data>
+</openerp>

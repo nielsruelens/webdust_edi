@@ -3,9 +3,9 @@ from openerp import pooler
 
 from openerp.osv import osv, fields
 
-class product_upload_thr(osv.TransientModel):
-    _name = 'product.upload.thr'
-    _description = 'Interfaces all products with THR'
+class thr_masterdata(osv.TransientModel):
+    _name = 'thr.masterdata'
+    _description = 'Interfaces all masterdata coming from THR'
 
 
     _columns = {
@@ -22,7 +22,7 @@ class product_upload_thr(osv.TransientModel):
     }
 
 
-    def _upload_thr_master(self, cr, uid, ids, context=None):
+    def _background(self, cr, uid, ids, context=None):
         prod_db = self.pool.get('product.product')
         new_cr = pooler.get_db(cr.dbname).cursor()
         (uploader,) = self.browse(new_cr, uid, ids, context=context)
@@ -34,24 +34,9 @@ class product_upload_thr(osv.TransientModel):
         new_cr.close()
         return {}
 
-    def upload_thr_master(self, cr, uid, ids, context=None):
-        """
-        @param self: The object pointer.
-        @param cr: A database cursor
-        @param uid: ID of the user currently logged in
-        @param ids: List of IDs selected
-        @param context: A standard dictionary
-        """
-        threaded_calculation = threading.Thread(target=self._upload_thr_master, args=(cr, uid, ids, context))
-        threaded_calculation.start()
+    def start(self, cr, uid, ids, context=None):
+        thread = threading.Thread(target=self._background, args=(cr, uid, ids, context))
+        thread.start()
         return {'type': 'ir.actions.act_window_close'}
-
-
-    def _upload_thr_pricing(self, cr, uid, ids, context=None):
-        return True
-    def upload_thr_pricing(self, cr, uid, ids, context=None):
-        return True
-
-
 
 

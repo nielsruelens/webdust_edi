@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <openerp>
     <data>
-        <act_window id="act_webdust_edi_purchase_order_out"
+        <act_window id="act_out_purchase_order"
             key2="client_action_multi" multi="True" name="Send EDI"
-            res_model="clubit.tools.edi.wizard.outgoing.purchase"
+            res_model="out.purchase.order"
             src_model="purchase.order" target="new"
             view_id="clubit_tools.clubit_tools_wizard_edi_outgoing_form" view_mode="form"
             context="{'flow_id': ref('clubit_tools_edi_flow_1')}" />

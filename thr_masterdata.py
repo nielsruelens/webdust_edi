@@ -28,7 +28,7 @@ class product(osv.Model):
             for the reimport EDI flow (masterdata THR).
             ------------------------------------------- '''
         model_db = self.pool.get('ir.model.data')
-        (flow_id,) = model_db.search(cr, uid,[('name','=','clubit_tools_edi_flow_5')])
+        (flow_id,) = model_db.search(cr, uid,[('name','=','edi_thr_product_master_in')])
         flow = model_db.browse(cr, uid, flow_id)
         return flow.res_id
 
