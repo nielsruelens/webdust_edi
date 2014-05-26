@@ -28,6 +28,37 @@
 			<field name="method">edi_import_availability</field>
 		</record>
 
+		<record id="edi_spree_sale_order_in" model="clubit.tools.edi.flow">
+			<field name="name">Sale Order(in)</field>
+			<field name="direction">in</field>
+			<field name="model">sale.order</field>
+			<field name="method">edi_import_spree</field>
+			<field name="validator">edi_import_validator</field>
+		</record>
+
+		<record id="edi_payment_term1" model="account.payment.term">
+			<field name="active">TRUE</field>
+			<field name="note">Overschrijving</field>
+			<field name="name">Overschrijving</field>
+		</record>
+		<record id="edi_payment_term2" model="account.payment.term">
+			<field name="active">TRUE</field>
+			<field name="note">Elektronische betaling</field>
+			<field name="name">Elektronische betaling</field>
+		</record>
+		<record id="edi_helpdesk_reference1" model="res.request.link">
+			<field name="priority">5</field>
+			<field name="object">clubit.tools.edi.document.incoming</field>
+			<field name="name">EDI Incoming</field>
+		</record>
+		<record id="edi_helpdesk_reference2" model="res.request.link">
+			<field name="priority">5</field>
+			<field name="object">clubit.tools.edi.document.outgoing</field>
+			<field name="name">EDI Outgoing</field>
+		</record>
+
+
+
         <record id="webdust_handig_nl" model="res.partner">
             <field name="name">Handig.nl</field>
         </record>
@@ -42,14 +73,5 @@
         <menuitem action="action_thr_masterdata"
             groups="clubit_tools.clubit_tools_edi_user"
             id="menu_thr_masterdata" parent="menu_webdust_product"/>
-        <menuitem action="action_spree_masterdata"
-            groups="clubit_tools.clubit_tools_edi_user"
-            id="menu_spree_masterdata" parent="menu_webdust_product"/>
-        <menuitem action="action_spree_pricing"
-            groups="clubit_tools.clubit_tools_edi_user"
-            id="menu_spree_pricing" parent="menu_webdust_product"/>
-        <menuitem action="action_spree_category"
-            groups="clubit_tools.clubit_tools_edi_user"
-            id="menu_spree_category" parent="menu_webdust_product"/>
     </data>
 </openerp>

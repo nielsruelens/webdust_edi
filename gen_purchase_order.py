@@ -7,13 +7,13 @@ class purchase_order(osv.Model):
     _inherit = "purchase.order"
 
 
-    ''' purchase.order:_function_edi_sent_get()
-        --------------------------------------
+    def _function_edi_sent_get(self, cr, uid, ids, field, arg, context=None):
+        ''' purchase.order:_function_edi_sent_get()
+        -------------------------------------------
         This method calculates the value of field edi_sent by
         looking at the database and checking for EDI docs
         on this purchase order.
         ------------------------------------------------------ '''
-    def _function_edi_sent_get(self, cr, uid, ids, field, arg, context=None):
         edi_db = self.pool.get('clubit.tools.edi.document.outgoing')
         flow_db = self.pool.get('clubit.tools.edi.flow')
         flow_id = flow_db.search(cr, uid, [('model', '=', 'purchase.order'),('method', '=', 'send_edi_out')])[0]
@@ -35,14 +35,13 @@ class purchase_order(osv.Model):
 
 
 
-    ''' purchase.order:edi_partner_resolver()
-        -------------------------------------
+    def edi_partner_resolver(self, cr, uid, ids, context):
+        ''' purchase.order:edi_partner_resolver()
+        -----------------------------------------
         This method attempts to find the correct partner
         to whom we should send an EDI document for a
         number of PO's.
         ------------------------------------------------ '''
-    def edi_partner_resolver(self, cr, uid, ids, context):
-
         result_list = []
         for pick in self.browse(cr, uid, ids, context):
             result_list.append({'id' : pick.id, 'partner_id': pick.partner_id.id})
@@ -54,16 +53,14 @@ class purchase_order(osv.Model):
 
 
 
-    ''' purchase.order:send_edi_out()
-        -----------------------------
+    def send_edi_out(self, cr, uid, items, context=None):
+        ''' purchase.order:send_edi_out()
+        ---------------------------------
         This method will perform the export of a purchase
         order, the simple version. Only PO's that
         are in state 'draft' may be passed to this
         method, otherwise an error will occur.
         ------------------------------------------------- '''
-    def send_edi_out(self, cr, uid, items, context=None):
-
-
         edi_db = self.pool.get('clubit.tools.edi.document.outgoing')
 
         # Get the selected items
@@ -95,60 +92,71 @@ class purchase_order(osv.Model):
 
 
 
-    ''' purchase.order:edi_export()
-        ---------------------------
+    def edi_export(self, cr, uid, po, edi_struct=None, context=None):
+        ''' purchase.order:edi_export()
+        -------------------------------
         This method parses a given object to a JSON
         EDI structure.
         ------------------------------------------- '''
-    def edi_export(self, cr, uid, po, edi_struct=None, context=None):
 
-        # Instantiate variables
+        # Lookup the sale order
         # ---------------------
-        edi_doc = {}
-        partner_db = self.pool.get('res.partner')
-        product_db = self.pool.get('product.product')
-        info_db = self.pool.get('product.supplierinfo')
+        sale_db = self.pool.get('sale.order')
+        sale_order = sale_db.search(cr, uid, [('name','=', po.origin)])
+        if sale_order:
+            sale_order = sale_db.browse(cr, uid, sale_order[0])
 
-        partner = partner_db.browse(cr, uid, po.partner_id.id, context)
 
         # Header fields
         # -------------
-        edi_doc['name']               = po.name
-        edi_doc['supplier']           = partner.name
-        edi_doc['supplier_order_ref'] = po.partner_ref
-        edi_doc['order_date']         = po.date_order
-        edi_doc['client_order_ref']   = po.origin
-        edi_doc['expected_date']      = po.minimum_planned_date
-        edi_doc['validated_by']       = True
-        edi_doc['date_approved']      = True
-        edi_doc['amount_untaxed']     = po.amount_untaxed
-        edi_doc['comment']            = po.notes
+        edi_doc = {
+            'shopID'            : '1',
+            'resellerID'        : '1',
+            'supplierReference' : po.name,
+            'shipmentProvider'  : 'GLS',
+            'deliveryMethod'    : '1',
+            'amountUntaxed'     : po.amount_untaxed,
+            'amountTotal'       : po.amount_total,
+            'expectedDate'      : po.minimum_planned_date,
+            'scheduledDate'     : po.minimum_planned_date,
+            'orderDate'         : po.date_order,
+            'orderPositions'    : [],
+        }
+
+        # If there is a sale order, attach customer info
+        if sale_order:
+            edi_doc['shippingAddress'] = {
+                'name'        : sale_order.partner_id.name,
+                'street'      : ' '.join([sale_order.partner_id.street, sale_order.partner_id.street2]),
+                'postalcode'  : sale_order.partner_id.zip,
+                'city'        : sale_order.partner_id.city,
+                'country'     : sale_order.partner_id.country_id.code,
+                'phone'       : sale_order.partner_id.phone,
+                'mobilephone' : sale_order.partner_id.mobile,
+                'email'       : sale_order.partner_id.email,
+            }
+
+            # If the customer is a company, add the following information
+            if sale_order.partner_id.parent_id:
+                edi_doc['shippingAddress']['company'] = sale_order.partner_id.parent_id.name
+                edi_doc['shippingAddress']['vat']     = sale_order.partner_id.parent_id.vat
+
+
 
         # Line items
         # ----------
-        edi_doc['lines'] = []
         for line in po.order_line:
-            edi_line = {}
-            product = product_db.browse(cr, uid, line.product_id.id, context)
 
-            # determine the product reference (default or supplier)
-            edi_line['product_ref'] = product.default_code
-            info_ids = info_db.search(cr, uid, [('name', '=', po.partner_id.id),('product_id', '=', product.id)], context=context)
-            if info_ids:
-                info = info_db.browse(cr, uid, info_ids, context)[0]
-                if info and info.product_code:
-                    edi_line['product_ref'] = info.product_code
+            edi_line = {
+                'positionID'    : line.id,
+                'articleNumber' : line.product_id.ean13,
+                'articleName'   : line.product_id.name,
+                'quantity'      : line.product_qty,
+                'unitPrice'     : line.price_unit,
+                'positionPrice' : line.price_subtotal,
+            }
 
-            edi_line['line_no']       = line.id
-            edi_line['product_name']  = product.name
-            edi_line['product_ean13'] = product.ean13
-            edi_line['line_qty']      = line.product_qty
-            edi_line['unit_price']    = line.price_unit
-            edi_line['line_price']    = line.price_subtotal
-            edi_doc['validated_by']   = True
-            edi_doc['date_approved']  = True
-
-            edi_doc['lines'].append(edi_line)
+            edi_doc['orderPositions'].append(edi_line)
 
         # Return the result
         # -----------------

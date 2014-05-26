@@ -1,4 +1,4 @@
-import purchase_order_out
+import gen_purchase_order
 import wizard
 import thr_combined
 import thr_masterdata
@@ -8,3 +8,4 @@ import thr_masterdata_products
 import thr_pricing
 import thr_availability
 import settings
+import spree_sale_order
