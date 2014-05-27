@@ -200,23 +200,8 @@ class sale_order(osv.Model):
                 'price_unit'      : line['price'],
                 'name'            : line['variant']['name'],
                 'th_weight'       : product.weight * line['quantity'],
-                #'type'            : 'make_to_stock',
+                'tax_id'          : [[6, False, self.pool.get('account.fiscal.position').map_tax(cr, uid, customer.property_account_position, product.taxes_id)   ]],
             }
-
-            #detail['tax_id'] = False
-            #if prod.taxes_id:
-            #    detail['tax_id']            = [[6,False,[]]]
-            #    if fiscal_pos:
-            #        new_taxes =  self.pool.get('account.fiscal.position').map_tax(cr, uid, fiscal_pos, prod.taxes_id)
-            #        if new_taxes:
-            #            detail['tax_id'][0][2] = new_taxes
-            #        else:
-            #            for tax in prod.taxes_id:
-            #                detail['tax_id'][0][2].append(tax.id)
-            #    else:
-            #        for tax in prod.taxes_id:
-            #            detail['tax_id'][0][2].append(tax.id)
-
 
             order_line = []
             order_line.extend([0])
@@ -231,6 +216,7 @@ class sale_order(osv.Model):
         if not order:
             edi_db.message_post(cr, uid, document.id, body='Error during processing: could not create the sale order, unknown reason.')
             return self.resolve_helpdesk_case(cr, uid, document)
+        self.action_button_confirm(cr, uid, [order])
         order = self.browse(cr, uid, order)
         return order.name
 
