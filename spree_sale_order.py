@@ -1,11 +1,5 @@
 from openerp.osv import osv
-from openerp.addons.edi import EDIMixin
-import datetime
 import json
-import copy
-import shutil
-from os import listdir
-from os.path import isfile, join
 from openerp.tools.translate import _
 
 
@@ -233,11 +227,12 @@ class sale_order(osv.Model):
 
         # Actually create the sale order
         # ------------------------------
-        sid = self.create(cr, uid, vals, context=None)
-        if not sid:
+        order = self.create(cr, uid, vals, context=None)
+        if not order:
             edi_db.message_post(cr, uid, document.id, body='Error during processing: could not create the sale order, unknown reason.')
             return self.resolve_helpdesk_case(cr, uid, document)
-        return True
+        order = self.browse(cr, uid, order)
+        return order.name
 
 
 
@@ -254,7 +249,7 @@ class sale_order(osv.Model):
         customer_id = ir_model_db.search(cr, uid, [('model', '=', 'res.partner'), ('module', '=', partner.name),('name', '=', customer['id'])])
         if customer_id:
             customer_id = ir_model_db.browse(cr, uid, customer_id[0])
-            return partner_db.browse(cr, uid, customer_id.res_id)
+            return partner_db.browse(cr, uid, customer_id.res_id), False
 
         # Partner doesn't exist yet, create it
         # ------------------------------------
@@ -291,7 +286,7 @@ class sale_order(osv.Model):
             'name'   : customer['id']
         }
         ir_model_db.create(cr, uid, vals)
-        return customer_id
+        return customer_id, False
 
 
 

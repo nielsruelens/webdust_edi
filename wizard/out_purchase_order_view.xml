@@ -6,6 +6,6 @@
             res_model="out.purchase.order"
             src_model="purchase.order" target="new"
             view_id="clubit_tools.clubit_tools_wizard_edi_outgoing_form" view_mode="form"
-            context="{'flow_id': ref('clubit_tools_edi_flow_1')}" />
+            context="{'flow_id': ref('edi_gen_purchase_order_out')}" />
     </data>
 </openerp>
