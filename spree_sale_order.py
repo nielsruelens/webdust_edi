@@ -3,17 +3,6 @@ import json
 from openerp.tools.translate import _
 
 
-
-
-class procurement_order(osv.Model):
-    _name = "procurement.order"
-    _inherit = "procurement.order"
-
-    def create(self, cr, uid, vals, context=None):
-        return super(procurement_order, self).create(cr, uid, vals, context)
-
-
-
 class sale_order(osv.Model):
     _name = "sale.order"
     _inherit = "sale.order"

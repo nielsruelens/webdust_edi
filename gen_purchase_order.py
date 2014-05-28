@@ -1,10 +1,57 @@
 from openerp.osv import osv,fields
 from openerp.tools.translate import _
+import inspect
 
 
 class purchase_order(osv.Model):
     _name = "purchase.order"
     _inherit = "purchase.order"
+
+
+
+    def create(self, cr, uid, vals, context=None):
+        ''' purchase.order:create()
+        ---------------------------
+        This method is overwritten to make sure the correct
+        partner is chosen. The default MRP logic simply chooses
+        the first partner, not the cheapest, fastest, ...
+        ------------------------------------------------------- '''
+        stack = inspect.stack()
+
+        # Only execute the custom code if we're in the MPR process
+        # --------------------------------------------------------
+        if stack[1][3] != 'create_procurement_purchase_order':
+            return super(purchase_order, self).create(cr, uid, vals, context)
+
+        supplier = self.determine_ideal_partner(cr, uid, vals)
+        vals['partner_id'] = supplier.name.id
+        vals['order_line'][0][2]['price_unit'] = supplier.default_price
+        return super(purchase_order, self).create(cr, uid, vals, context)
+
+
+    def determine_ideal_partner(self, cr, uid, vals):
+        ''' purchase.order:determine_ideal_partner()
+        --------------------------------------------
+        Given a set of values that will become a PO, this method
+        determines the ideal partner in case "lowest price" is
+        chosen for the product.
+        -------------------------------------------------------- '''
+
+        prod_db = self.pool.get('product.product')
+        product = prod_db.browse(cr, uid, vals['order_line'][0][2]['product_id'] )
+        if product.cost_method != 'lowest':
+            return vals['partner_id']
+
+        lowest_supplier = False
+        for supplier in product.seller_ids:
+            if supplier.state == 'unavailable': continue
+            if not lowest_supplier:
+                lowest_supplier = supplier
+                continue
+            if supplier.default_price < lowest_supplier.default_price:
+                lowest_supplier = supplier
+
+        return lowest_supplier
 
 
     def _function_edi_sent_get(self, cr, uid, ids, field, arg, context=None):
