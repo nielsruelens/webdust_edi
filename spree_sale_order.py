@@ -3,6 +3,17 @@ import json
 from openerp.tools.translate import _
 
 
+
+
+class procurement_order(osv.Model):
+    _name = "procurement.order"
+    _inherit = "procurement.order"
+
+    def create(self, cr, uid, vals, context=None):
+        return super(procurement_order, self).create(cr, uid, vals, context)
+
+
+
 class sale_order(osv.Model):
     _name = "sale.order"
     _inherit = "sale.order"
@@ -185,6 +196,8 @@ class sale_order(osv.Model):
             'date_order'          : data['created_at'][0:10],
             'payment_term'        : payment,
             'order_line'          : [],
+            'picking_policy'      : 'one',
+            'order_policy'        : 'picking'
         }
 
 
@@ -197,6 +210,7 @@ class sale_order(osv.Model):
                 'product_uos_qty' : line['quantity'],
                 'product_uom_qty' : line['quantity'],
                 'product_id'      : product.id,
+                'type'            : product.procure_method,
                 'price_unit'      : line['price'],
                 'name'            : line['variant']['name'],
                 'th_weight'       : product.weight * line['quantity'],
