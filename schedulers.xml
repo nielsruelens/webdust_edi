@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<openerp>
+	<data>
+		<!-- Automatic PO Quotation EDI out scheduler -->
+		<record model="ir.cron" id="webdust_edi_auto_po_quotation_out">
+			<field name="name">Custom MRP/EDI Scheduler</field>
+			<field name="active" eval="True" />
+			<field name="interval_number">1</field>
+			<field name="interval_type">minutes</field>
+			<field name="numbercall">-1</field>
+			<field name="doall" eval="False" />
+			<field name="nextcall" eval="time.strftime('%Y-%m-%d %H:%M')" />
+			<field name="model">purchase.order</field>
+			<field name="function">auto_edi_out</field>
+			<field name="args">()</field>
+		</record>
+
+		<!-- THR FTP masterdata downloader -->
+		<record model="ir.cron" id="webdust_thr_ftp_downloader">
+			<field name="name">EDI/FTP masterdata downloader</field>
+			<field name="active" eval="True" />
+			<field name="interval_number">120</field>
+			<field name="interval_type">minutes</field>
+			<field name="numbercall">-1</field>
+			<field name="doall" eval="False" />
+			<field name="nextcall" eval="time.strftime('%Y-%m-%d %H:%M')" />
+			<field name="model">product.product</field>
+			<field name="function">thr_ftp_download</field>
+			<field name="args">()</field>
+		</record>
+	</data>
+</openerp>

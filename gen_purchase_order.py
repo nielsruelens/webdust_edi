@@ -1,57 +1,94 @@
 from openerp.osv import osv,fields
 from openerp.tools.translate import _
-import inspect
-
 
 class purchase_order(osv.Model):
     _name = "purchase.order"
     _inherit = "purchase.order"
 
 
+# Dead code, but keeping it anyways
+# MRP logic is way more complex than this
+#    def create(self, cr, uid, vals, context=None):
+#        ''' purchase.order:create()
+#        ---------------------------
+#        This method is overwritten to make sure the correct
+#        partner is chosen. The default MRP logic simply chooses
+#        the first partner, not the cheapest, fastest, ...
+#        ------------------------------------------------------- '''
+#
+#        # Only execute the custom code if we're in the MPR process
+#        # --------------------------------------------------------
+#        stack = inspect.stack()
+#        if stack[1][3] == 'create_procurement_purchase_order':
+#            supplier = self.determine_ideal_partner(cr, uid, vals)
+#            vals['partner_id'] = supplier.name.id
+#            vals['order_line'][0][2]['price_unit'] = supplier.default_price
+#
+#        return super(purchase_order, self).create(cr, uid, vals, context)
+#
+#
+#    def determine_ideal_partner(self, cr, uid, vals):
+#        ''' purchase.order:determine_ideal_partner()
+#        --------------------------------------------
+#        Given a set of values that will become a PO, this method
+#        determines the ideal partner in case "lowest price" is
+#        chosen for the product.
+#        -------------------------------------------------------- '''
+#
+#        prod_db = self.pool.get('product.product')
+#        product = prod_db.browse(cr, uid, vals['order_line'][0][2]['product_id'] )
+#        if product.cost_method != 'lowest':
+#            return vals['partner_id']
+#
+#        lowest_supplier = False
+#        for supplier in product.seller_ids:
+#            if supplier.state == 'unavailable': continue
+#            if not lowest_supplier:
+#                lowest_supplier = supplier
+#                continue
+#            if supplier.default_price < lowest_supplier.default_price:
+#                lowest_supplier = supplier
+#
+#        return lowest_supplier
 
-    def create(self, cr, uid, vals, context=None):
-        ''' purchase.order:create()
-        ---------------------------
-        This method is overwritten to make sure the correct
-        partner is chosen. The default MRP logic simply chooses
-        the first partner, not the cheapest, fastest, ...
-        ------------------------------------------------------- '''
-        stack = inspect.stack()
 
-        # Only execute the custom code if we're in the MPR process
-        # --------------------------------------------------------
-        if stack[1][3] != 'create_procurement_purchase_order':
-            return super(purchase_order, self).create(cr, uid, vals, context)
+    def auto_edi_out(self, cr, uid):
+        ''' purchase.order:auto_edi_out()
+        ---------------------------------
+        This method is used as a scheduler to automatically run
+        the MRP scheduler (to make sure PO's are properly merged) and then
+        send EDI messages for the resulting quotations. An EDI document is
+        only sent once.
+        ------------------------------------------------------------------ '''
 
-        supplier = self.determine_ideal_partner(cr, uid, vals)
-        vals['partner_id'] = supplier.name.id
-        vals['order_line'][0][2]['price_unit'] = supplier.default_price
-        return super(purchase_order, self).create(cr, uid, vals, context)
+        proc_db = self.pool.get('procurement.order')
+        flow_db = self.pool.get('clubit.tools.edi.flow')
+        edi_db = self.pool.get('clubit.tools.edi.wizard.outgoing')
 
+        # Run the MRP Scheduler
+        # ---------------------
+        proc_db.run_scheduler(cr, uid, False, True)
 
-    def determine_ideal_partner(self, cr, uid, vals):
-        ''' purchase.order:determine_ideal_partner()
-        --------------------------------------------
-        Given a set of values that will become a PO, this method
-        determines the ideal partner in case "lowest price" is
-        chosen for the product.
-        -------------------------------------------------------- '''
+        # Automatically send EDI documents
+        # --------------------------------
+        flow_id = flow_db.search(cr, uid, [('model', '=', 'purchase.order'),('method','=','send_edi_out')])
+        if not flow_id:
+            return False
 
-        prod_db = self.pool.get('product.product')
-        product = prod_db.browse(cr, uid, vals['order_line'][0][2]['product_id'] )
-        if product.cost_method != 'lowest':
-            return vals['partner_id']
+        pids = self.search(cr, uid, [('state', '=', 'draft')])
+        orders = self.browse(cr, uid, pids)
+        pids = [x.id for x in orders if not x.edi_sent]
+        if not pids:
+            return True
 
-        lowest_supplier = False
-        for supplier in product.seller_ids:
-            if supplier.state == 'unavailable': continue
-            if not lowest_supplier:
-                lowest_supplier = supplier
-                continue
-            if supplier.default_price < lowest_supplier.default_price:
-                lowest_supplier = supplier
+        context = {
+            'active_ids': pids,
+            'active_model': 'purchase.order',
+            'flow_id': flow_id[0],
+        }
+        edi_db.resolve(cr, uid, pids, context)
+        return True
 
-        return lowest_supplier
 
 
     def _function_edi_sent_get(self, cr, uid, ids, field, arg, context=None):
@@ -172,9 +209,12 @@ class purchase_order(osv.Model):
 
         # If there is a sale order, attach customer info
         if sale_order:
+            street = sale_order.partner_id.street
+            if sale_order.partner_id.street2:
+                street = ' '.join([street,sale_order.partner_id.street2])
             edi_doc['shippingAddress'] = {
                 'name'        : sale_order.partner_id.name,
-                'street'      : ' '.join([sale_order.partner_id.street, sale_order.partner_id.street2]),
+                'street'      : street,
                 'postalcode'  : sale_order.partner_id.zip,
                 'city'        : sale_order.partner_id.city,
                 'country'     : sale_order.partner_id.country_id.code,

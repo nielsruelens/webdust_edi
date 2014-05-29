@@ -12,6 +12,7 @@
         'clubit_tools',
         'purchase',
         'webdust_product',
+        'clubit_mrp_auto_po_merge',
     ],
     'data': [
         'wizard/thr_masterdata_view.xml',
@@ -20,6 +21,7 @@
         'category_view.xml',
         'config.xml',
         'settings.xml',
+        'schedulers.xml',
         'wizard/out_purchase_order_view.xml',
     ],
     'demo': [
