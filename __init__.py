@@ -1,6 +1,5 @@
 import gen_purchase_order
 import wizard
-import config
 import thr_combined
 import thr_masterdata
 import thr_masterdata_ftp_download
