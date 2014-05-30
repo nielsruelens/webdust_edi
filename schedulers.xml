@@ -32,7 +32,7 @@
 		<!-- THR FTP masterdata downloader -->
 		<record model="ir.cron" id="webdust_thr_masterdata_combined">
 			<field name="name">EDI/THR masterdata combined upload</field>
-			<field name="active" eval="True" />
+			<field name="active" eval="False" />
 			<field name="interval_number">1</field>
 			<field name="interval_type">weeks</field>
 			<field name="numbercall">-1</field>

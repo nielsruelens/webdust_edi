@@ -177,7 +177,6 @@ class product(osv.Model):
                 self.log.info('UPLOAD_THR-PRODUCTS: processing product with EAN {!s} ({!s} of {!s})'.format(line[1], i, len(content)))
                 existing = next((x for x in all_existing if x.ean13 == line[1]), None)
 
-
                 # Commit every 200 products to make sure
                 # lost work in case of problems is limited
                 # ----------------------------------------

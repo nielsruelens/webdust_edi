@@ -21,7 +21,7 @@ class product(osv.Model):
         # Make sure the settings are defined
         # ----------------------------------
         edi_db = self.pool.get('clubit.tools.edi.document.incoming')
-        self.settings = self.pool.get('webdust.edi.settings').get_settings(cr, uid)
+        self.settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
         if not self.settings:
             edi_db.message_post(cr, uid, ids, body='Could not start the pricing upload, missing EDI settings.')
             return False

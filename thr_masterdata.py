@@ -139,7 +139,7 @@ class product(osv.Model):
             self.log.info('UPLOAD_THR: masterdata upload complete.')
             return True
 
-        self.settings = self.pool.get('webdust.edi.settings').get_settings(cr, uid)
+        self.settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
         if not self.settings:
             self.log.warning('UPLOAD_THR: could not load EDI settings, aborting process.')
             return True
