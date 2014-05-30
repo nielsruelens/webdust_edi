@@ -1,9 +1,36 @@
 from openerp.osv import osv,fields
 from openerp.tools.translate import _
+import logging
 
 class purchase_order(osv.Model):
     _name = "purchase.order"
     _inherit = "purchase.order"
+
+
+    def _function_edi_sent_get(self, cr, uid, ids, field, arg, context=None):
+        ''' purchase.order:_function_edi_sent_get()
+        -------------------------------------------
+        This method calculates the value of field edi_sent by
+        looking at the database and checking for EDI docs
+        on this purchase order.
+        ------------------------------------------------------ '''
+        edi_db = self.pool.get('clubit.tools.edi.document.outgoing')
+        flow_db = self.pool.get('clubit.tools.edi.flow')
+        flow_id = flow_db.search(cr, uid, [('model', '=', 'purchase.order'),('method', '=', 'send_edi_out')])[0]
+        res = dict.fromkeys(ids, False)
+        for po in self.browse(cr, uid, ids, context=context):
+            docids = edi_db.search(cr, uid, [('flow_id', '=', flow_id),('reference', '=', po.name)])
+            if not docids: continue
+            edi_docs = edi_db.browse(cr, uid, docids, context=context)
+            edi_docs.sort(key = lambda x: x.create_date, reverse=True)
+            res[po.id] = edi_docs[0].create_date
+        return res
+
+
+    _columns = {
+        'edi_sent': fields.function(_function_edi_sent_get, type='datetime', string='EDI sent'),
+        'auto_edi_allowed': fields.boolean('Allow auto EDI sending'),
+    }
 
 
 # Dead code, but keeping it anyways
@@ -61,6 +88,9 @@ class purchase_order(osv.Model):
         only sent once.
         ------------------------------------------------------------------ '''
 
+        log = logging.getLogger(None)
+        log.info('AUTO_PO_EDI_OUT: Starting processing on the auto PO EDI out flow.')
+
         proc_db = self.pool.get('procurement.order')
         flow_db = self.pool.get('clubit.tools.edi.flow')
         edi_db = self.pool.get('clubit.tools.edi.wizard.outgoing')
@@ -73,13 +103,17 @@ class purchase_order(osv.Model):
         # --------------------------------
         flow_id = flow_db.search(cr, uid, [('model', '=', 'purchase.order'),('method','=','send_edi_out')])
         if not flow_id:
+            log.warning('AUTO_PO_EDI_OUT: Could not find PO edi out flow, aborting.')
             return False
 
         pids = self.search(cr, uid, [('state', '=', 'draft')])
         orders = self.browse(cr, uid, pids)
-        pids = [x.id for x in orders if not x.edi_sent]
+        pids = [x.id for x in orders if not x.edi_sent and ( x.create_uid.id == 1 or ( x.create_uid.id != 1 and x.auto_edi_allowed ) ) ]
         if not pids:
+            log.info('AUTO_PO_EDI_OUT: No quotations found to send. Processing is done.')
             return True
+
+        log.info('AUTO_PO_EDI_OUT: Sending the following POs: {!s}'.format(str(pids)))
 
         context = {
             'active_ids': pids,
@@ -87,35 +121,8 @@ class purchase_order(osv.Model):
             'flow_id': flow_id[0],
         }
         edi_db.resolve(cr, uid, pids, context)
+        log.info('AUTO_PO_EDI_OUT: Processing is done.')
         return True
-
-
-
-    def _function_edi_sent_get(self, cr, uid, ids, field, arg, context=None):
-        ''' purchase.order:_function_edi_sent_get()
-        -------------------------------------------
-        This method calculates the value of field edi_sent by
-        looking at the database and checking for EDI docs
-        on this purchase order.
-        ------------------------------------------------------ '''
-        edi_db = self.pool.get('clubit.tools.edi.document.outgoing')
-        flow_db = self.pool.get('clubit.tools.edi.flow')
-        flow_id = flow_db.search(cr, uid, [('model', '=', 'purchase.order'),('method', '=', 'send_edi_out')])[0]
-        res = dict.fromkeys(ids, False)
-        for po in self.browse(cr, uid, ids, context=context):
-            docids = edi_db.search(cr, uid, [('flow_id', '=', flow_id),('reference', '=', po.name)])
-            if not docids: continue
-            edi_docs = edi_db.browse(cr, uid, docids, context=context)
-            edi_docs.sort(key = lambda x: x.create_date, reverse=True)
-            res[po.id] = edi_docs[0].create_date
-        return res
-
-
-    _columns = {
-        'edi_sent': fields.function(_function_edi_sent_get, type='datetime', string='EDI sent'),
-    }
-
-
 
 
 

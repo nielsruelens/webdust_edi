@@ -24,6 +24,9 @@ class product(osv.Model):
 
     def thr_ftp_download(self, cr, uid):
 
+        helpdesk_db = self.pool.get('crm.helpdesk')
+        header = 'An error occurred during the THR_FTP download scheduler.'
+
         # Find the customizing
         # --------------------
         flow_db = self.pool.get('clubit.tools.edi.flow')
@@ -31,7 +34,7 @@ class product(osv.Model):
         settings = self.pool.get('webdust.edi.settings').get_settings(cr, uid)
         ftp_info = [x for x in settings.connections if x.name == 'THR_FTP']
         if not ftp_info:
-            self.create_helpdesk_case(cr, uid, 'Missing THR_FTP connection in the EDI settings')
+            helpdesk_db.create_simple_case(cr, uid, header, 'Missing THR_FTP connection in the EDI settings')
             return True
         ftp_info = ftp_info[0]
 
@@ -42,7 +45,7 @@ class product(osv.Model):
         try:
             ftp = ftplib.FTP(ftp_info.url, ftp_info.user, ftp_info.password)
         except Exception as e:
-            self.create_helpdesk_case(cr, uid, 'Could not connect to FTP server at {!s}, error given: {!s}'.format(ftp_info.url, str(e)))
+            helpdesk_db.create_simple_case(cr, uid, header, 'Could not connect to FTP server at {!s}, error given: {!s}'.format(ftp_info.url, str(e)))
             return True
 
 
@@ -50,7 +53,7 @@ class product(osv.Model):
         # ---------------------------------------
         success = ftp.cwd('Artikelgegevens')
         if not success:
-            self.create_helpdesk_case(cr, uid, 'Connected to FTP server {!s}, but could not find folder Artikelgegevens'.format(ftp_info.url))
+            helpdesk_db.create_simple_case(cr, uid, header, 'Connected to FTP server {!s}, but could not find folder Artikelgegevens'.format(ftp_info.url))
             ftp.quit()
             return True
 
@@ -59,14 +62,14 @@ class product(osv.Model):
         # ----------------------------
         files = list_files(ftp)
         if not files:
-            self.create_helpdesk_case(cr, uid, 'Connected to FTP server {!s}, but folder Artikelgegevens did not contain any files'.format(ftp_info.url))
+            helpdesk_db.create_simple_case(cr, uid, header, 'Connected to FTP server {!s}, but folder Artikelgegevens did not contain any files'.format(ftp_info.url))
             ftp.quit()
             return True
 
         # We're looking for CSV files
         files = [f for f in files if f[-1][-3:] == 'csv']
         if not files:
-            self.create_helpdesk_case(cr, uid, 'Connected to FTP server {!s}, but folder Artikelgegevens did not contain any csv files'.format(ftp_info.url))
+            helpdesk_db.create_simple_case(cr, uid, header, 'Connected to FTP server {!s}, but folder Artikelgegevens did not contain any csv files'.format(ftp_info.url))
             ftp.quit()
             return True
 
@@ -80,7 +83,7 @@ class product(osv.Model):
                     ftp.retrbinary('RETR {!s}'.format(f[-1]), out.write)
                     out.close()
                 except Exception as e:
-                    self.create_helpdesk_case(cr, uid, 'Tried to download file {!s} to {!s}, but got the following error: {!s}'.format(f[-1], path, str(e)))
+                    helpdesk_db.create_simple_case(cr, uid, header, 'Tried to download file {!s} to {!s}, but got the following error: {!s}'.format(f[-1], path, str(e)))
                     return True
 
 
@@ -93,7 +96,7 @@ class product(osv.Model):
                     ftp.retrbinary('RETR {!s}'.format(f[-1]), out.write)
                     out.close()
                 except Exception as e:
-                    self.create_helpdesk_case(cr, uid, 'Tried to download file {!s} to {!s}, but got the following error: {!s}'.format(f[-1], path, str(e)))
+                    helpdesk_db.create_simple_case(cr, uid, header, 'Tried to download file {!s} to {!s}, but got the following error: {!s}'.format(f[-1], path, str(e)))
                     return True
 
 
@@ -101,13 +104,6 @@ class product(osv.Model):
         # ------------------------------------------
         ftp.quit()
         exit()
-
-
-
-
-    def create_helpdesk_case(self, cr, uid, content):
-        helpdesk_db = self.pool.get('crm.helpdesk')
-        helpdesk_db.create(cr, uid, {'user_id': 6, 'name': 'An error occurred during the THR_FTP download scheduler.', 'description': content })
 
 
 

@@ -44,6 +44,8 @@ class product(osv.Model):
 
         if result:
             edi_db.message_post(cr, uid, ids, body='<br/>'.join(list(chain(*result))))
+            warning = '\n'.join(list(chain(*result)))
+            self.pool.get('crm.helpdesk').create_simple_case(cr, uid, 'These warnings generated during the THR availability upload need to be validated.', warning)
         return True
 
 

@@ -1,4 +1,5 @@
 import gen_purchase_order
+import crm_helpdesk
 import wizard
 import thr_combined
 import thr_masterdata

@@ -18,6 +18,7 @@ class product(osv.Model):
 
     header = []
     invalid = []
+    warnings = []
 
 
     def clear_globals(self, cr, uid):
@@ -30,6 +31,7 @@ class product(osv.Model):
         self.categories = []
         self.header = []
         self.invalid = []
+        self.warnings = []
 
     def get_all_properties(self, cr, uid):
         ''' product.product:get_all_properties()
@@ -74,6 +76,10 @@ class product(osv.Model):
         also make sure to split processing in multiple threads.
         ------------------------------------------------------- '''
 
+        helpdesk_db = self.pool.get('crm.helpdesk')
+        header = 'An error occurred during the THR masterdata import.'
+
+
         self.log.info('UPLOAD_THR-PRODUCTS: starting on the products.')
         self.header = content[0]
         del content[0]
@@ -84,6 +90,7 @@ class product(osv.Model):
         self.read_thr_partner(cr, uid)
         if not self.thr:
             self.log.error('UPLOAD_THR-PRODUCTS: could not find partner THR, aborting process.')
+            helpdesk_db.create_simple_case(cr, uid, header, 'UPLOAD_THR-PRODUCTS: could not find partner THR, aborting process.')
             return True
 
 
@@ -93,7 +100,6 @@ class product(osv.Model):
         self.get_all_categories(cr, uid)
 
 
-
         # Fix all EAN codes, might be a couple missing leading zeroes
         # Reason this is done beforehand is because we want to be
         # able to search for all existing products in 1 go, see below.
@@ -101,18 +107,11 @@ class product(osv.Model):
         self.log.info('UPLOAD_THR-PRODUCTS: checking if all the EAN codes are 13 chars long.')
         for i, line in enumerate(content):
             if len(line[1]) < 13:
-                self.log.warning('UPLOAD_THR-PRODUCTS: adding missing leading zeroes to EAN {!s}'.format(line[1]))
+                warning = 'UPLOAD_THR-PRODUCTS: adding missing leading zeroes to EAN {!s}'.format(line[1])
+                self.log.warning(warning)
+                self.warnings.append(warning)
                 line[1] = '0' * (13-len(line[1])) + line[1]
                 content[i+1] = line
-
-
-        # Remove THR as the supplier for any products that aren't mentioned
-        # in the file. The reason this step is optional is due to the fact
-        # that we're also processing this method using the EDI flow, in which case
-        # the file will be practically empty and we don't want to accidentally delete all data!
-        # -------------------------------------------------------------------------------------
-        #if do_supplier_removal:
-        #    self.remove_obsolete_products(cr, uid, content, context=context)
 
 
 
@@ -134,6 +133,12 @@ class product(osv.Model):
         self.log.info('UPLOAD_THR-PRODUCTS: All threads have finished.')
 
 
+        # Write any warnings to a CRM helpdesk case
+        # -----------------------------------------
+        if self.warnings:
+            warning = '\n'.join(self.warnings)
+            helpdesk_db.create_simple_case(cr, uid, 'These warnings generated during the THR masterdata upload need to be validated.', warning)
+            return True
 
 
 
@@ -187,7 +192,9 @@ class product(osv.Model):
                     prod = self.create_new_product(new_cr, uid,line)
                     if 'rejection' in prod:
                         self.invalid.append(line)
-                        self.log.warning('UPLOAD_THR-PRODUCTS: {!s}'.format(prod['rejection']))
+                        warning ='UPLOAD_THR-PRODUCTS: {!s}'.format(prod['rejection'])
+                        self.log.warning(warning)
+                        self.warnings.append(warning)
 
                 # Updating an existing product
                 # ----------------------------
@@ -217,7 +224,7 @@ class product(osv.Model):
         if line[1] and check_ean(line[1]):
             vals['ean13'] = line[1]
         else:
-            return {'rejection': 'product rejected because EAN is invalid.'}
+            return {'rejection': 'Product {!s} rejected because EAN is invalid.'.format(line[1])}
 
 
         # Determine the category
@@ -233,17 +240,17 @@ class product(osv.Model):
         elif line[2]:
             vals['categ_id'] = line[2]
         else:
-            return {'rejection': 'Product rejected because category is not provided.'}
+            return {'rejection': 'Product {!s} rejected because category is not provided.'.format(vals['ean13'])}
 
 
         vals['categ_id'] = next((x['id'] for x in self.categories if x['code'] == vals['categ_id']),None)
         if not vals['categ_id']:
-            return {'rejection': 'Product rejected because category is unknown.'}
+            return {'rejection': 'Product {!s} rejected because category is unknown.'.format(vals['ean13'])}
 
 
         vals['name'] = ' '.join((line[41], line[40], line[42]))
         if not vals['name']:
-            return {'rejection': 'Product rejected because name could not be determined.'}
+            return {'rejection': 'Product {!s} rejected because name could not be determined.'.format(vals['ean13'])}
 
         # THR product code
         # ----------------
@@ -374,47 +381,6 @@ class product(osv.Model):
         vals['recommended_price'] = line[24]
         return {'id' : self.write(cr, uid, [product.id], vals, context=None)}
 
-
-
-    def remove_obsolete_products(self, cr, uid, content, context=None):
-        ''' product.product:remove_obsolete_products()
-        ----------------------------------------------
-        This method calculates which products are currently
-        listed as being supplied by THR and checks if they're
-        still mentioned in the to-be imported content. If not,
-        it means THR no longer supplies this product and the
-        listing is removed as such.
-
-
-        !!! Method currently isn't used!!!!!!
-        ------------------------------------------------------ '''
-
-        self.log.info('UPLOAD_THR-PRODUCTS: Removing supplier information for products THR no longer supplies.')
-
-        supplier_db = self.pool.get('product.supplierinfo')
-
-        # All products mentioned in the file
-        # ----------------------------------
-        current = set([x[0] for x in content])
-
-        # All products currently supplied by THR
-        # --------------------------------------
-        old = supplier_db.search(cr, uid, [('name', '=', self.thr)],context=context)
-        old_total = supplier_db.browse(cr, uid, old, context=context)
-        old = set([x.product_code for x in old_total])
-
-        # These products are no longer supplied
-        # -------------------------------------
-        obsolete = old - current
-        obsolete = [x for x in old_total if x.product_code in obsolete]
-
-        # Remove the supplier info
-        # ------------------------
-        for info in obsolete:
-            vals = {'seller_ids' : [(2, info.id,False)]}
-            self.write(cr, uid, [info.product_id.id], vals, context=context)
-
-        cr.commit()
 
 
 
