@@ -1,37 +1,19 @@
 from openerp.osv import osv,fields
 from openerp.tools.translate import _
 import logging
+import json, requests, datetime
 
 class purchase_order(osv.Model):
     _name = "purchase.order"
     _inherit = "purchase.order"
 
-
-    def _function_edi_sent_get(self, cr, uid, ids, field, arg, context=None):
-        ''' purchase.order:_function_edi_sent_get()
-        -------------------------------------------
-        This method calculates the value of field edi_sent by
-        looking at the database and checking for EDI docs
-        on this purchase order.
-        ------------------------------------------------------ '''
-        edi_db = self.pool.get('clubit.tools.edi.document.outgoing')
-        flow_db = self.pool.get('clubit.tools.edi.flow')
-        flow_id = flow_db.search(cr, uid, [('model', '=', 'purchase.order'),('method', '=', 'send_edi_out')])[0]
-        res = dict.fromkeys(ids, False)
-        for po in self.browse(cr, uid, ids, context=context):
-            docids = edi_db.search(cr, uid, [('flow_id', '=', flow_id),('reference', '=', po.name)])
-            if not docids: continue
-            edi_docs = edi_db.browse(cr, uid, docids, context=context)
-            edi_docs.sort(key = lambda x: x.create_date, reverse=True)
-            res[po.id] = edi_docs[0].create_date
-        return res
-
-
     _columns = {
-        'edi_sent': fields.function(_function_edi_sent_get, type='datetime', string='EDI sent'),
+        'quotation_sent_at': fields.datetime('Quotation sent at', readonly=True),
         'auto_edi_allowed': fields.boolean('Allow auto EDI sending'),
+        'create_date':fields.datetime('Creation date'), #added so we can use it in the model
     }
 
+    _PUSH_CODE = 'PUSH_ERROR'
 
 # Dead code, but keeping it anyways
 # MRP logic is way more complex than this
@@ -79,111 +61,138 @@ class purchase_order(osv.Model):
 #        return lowest_supplier
 
 
-    def auto_edi_out(self, cr, uid):
-        ''' purchase.order:auto_edi_out()
-        ---------------------------------
+    def push_quotations(self, cr, uid):
+        ''' purchase.order:push_quotations()
+        ------------------------------------
         This method is used as a scheduler to automatically run
         the MRP scheduler (to make sure PO's are properly merged) and then
-        send EDI messages for the resulting quotations. An EDI document is
-        only sent once.
-        ------------------------------------------------------------------ '''
+        handle the EDI processing. Eligible documents are sent using a REST
+        service. The response to this request is handled in a different
+        scheduler due to asynchronous processing.
+        ------------------------------------------------------------------- '''
 
         log = logging.getLogger(None)
-        log.info('AUTO_PO_EDI_OUT: Starting processing on the auto PO EDI out flow.')
+        log.info('QUOTATION_PUSHER: Starting processing on the quotation pusher.')
 
         proc_db = self.pool.get('procurement.order')
-        flow_db = self.pool.get('clubit.tools.edi.flow')
-        edi_db = self.pool.get('clubit.tools.edi.wizard.outgoing')
+        helpdesk_db = self.pool.get('crm.helpdesk')
 
         # Run the MRP Scheduler
         # ---------------------
+        log.info('QUOTATION_PUSHER: Running the standard MRP scheduler.')
         proc_db.run_scheduler(cr, uid, False, True)
 
-        # Automatically send EDI documents
-        # --------------------------------
-        flow_id = flow_db.search(cr, uid, [('model', '=', 'purchase.order'),('method','=','send_edi_out')])
-        if not flow_id:
-            log.warning('AUTO_PO_EDI_OUT: Could not find PO edi out flow, aborting.')
-            return False
 
-        pids = self.search(cr, uid, [('state', '=', 'draft')])
-        orders = self.browse(cr, uid, pids)
-        pids = [x.id for x in orders if not x.edi_sent and ( x.create_uid.id == 1 or ( x.create_uid.id != 1 and x.auto_edi_allowed ) ) ]
-        if not pids:
-            log.info('AUTO_PO_EDI_OUT: No quotations found to send. Processing is done.')
+        # Make sure the required customizing is present
+        # ---------------------------------------------
+        settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
+        rest_info = [x for x in settings.connections if x.name == 'THR_REST_PO']
+        if not rest_info:
+            log.warning('QUOTATION_PUSHER: Could not find the THR_REST_PO connection settings, creating CRM helpdesk case.')
+            helpdesk_db.create_simple_case(cr, uid, 'An error occurred during the MRP/EDI Quotation pusher.', 'Missing THR_REST_PO connection in the EDI settings')
+            return True
+        rest_info = rest_info[0]
+
+        http_info = [x for x in settings.connections if x.name == 'HTTP_EDI_SERVER']
+        if not http_info:
+            log.warning('QUOTATION_PUSHER: Could not find the HTTP_EDI_SERVER connection settings, creating CRM helpdesk case.')
+            helpdesk_db.create_simple_case(cr, uid, 'An error occurred during the MRP/EDI Quotation pusher.', 'Missing HTTP_EDI_SERVER connection in the EDI settings')
+            return True
+        http_info = http_info[0]
+
+        # Test if the website is up, no need to hog resources otherwise
+        # -------------------------------------------------------------
+        log.info('QUOTATION_PUSHER: Polling if connection is available.')
+        try:
+            requests.head(rest_info.url, timeout = 10)
+        except Exception as e:
+            log.warning('QUOTATION_PUSHER: Connection is not available! Creating a helpdesk case and aborting process.')
+            helpdesk_db.create_simple_case(cr, uid, 'MRP/EDI Quotation pusher: connection is down.',
+                                                    'Could not connect to {!s}, cannot push quotations! \nError given is {!s}'.format(rest_info.url, str(e)))
             return True
 
-        log.info('AUTO_PO_EDI_OUT: Sending the following POs: {!s}'.format(str(pids)))
 
-        context = {
-            'active_ids': pids,
-            'active_model': 'purchase.order',
-            'flow_id': flow_id[0],
-        }
-        edi_db.resolve(cr, uid, pids, context)
-        log.info('AUTO_PO_EDI_OUT: Processing is done.')
+        # Search for documents that need to be sent
+        # -----------------------------------------
+        log.info('QUOTATION_PUSHER: Searching for quotations to send.')
+        pids = self.search(cr, uid, [('state', '=', 'draft'), ('quotation_sent_at', '=', False)])
+        if not pids:
+            log.info('QUOTATION_PUSHER: No quotations found. Processing is done.')
+            return True
+
+        log.info('QUOTATION_PUSHER: Sending the following POs: {!s}'.format(str(pids)))
+        orders = self.browse(cr, uid, pids)
+
+
+        # Process every quotation
+        # -----------------------
+        for order in orders:
+
+            # Check if there's an open helpdesk case for this order.
+            # If so, don't try to send it.
+            # ------------------------------------------------------
+
+            case = False
+            hids = helpdesk_db.search(cr, uid, [('ref', '=', 'purchase.order,{!s}'.format(str(order.id))), ('description','=', self._PUSH_CODE)])
+            if hids:
+                case = helpdesk_db.browse(cr, uid, hids[0])
+                if case.state != 'done':
+                    log.info('QUOTATION_PUSHER: Skipping quotation {!s} because it has an open helpdesk case.'.format(order.name))
+                    continue
+
+            # Push this order
+            # ---------------
+            log.info('QUOTATION_PUSHER: Pushing quotation {!s}.'.format(order.name))
+            self.push(cr, uid, order, rest_info, http_info, case)
+
+        log.info('QUOTATION_PUSHER: Processing is done.')
         return True
 
 
 
-    def edi_partner_resolver(self, cr, uid, ids, context):
-        ''' purchase.order:edi_partner_resolver()
-        -----------------------------------------
-        This method attempts to find the correct partner
-        to whom we should send an EDI document for a
-        number of PO's.
-        ------------------------------------------------ '''
-        result_list = []
-        for pick in self.browse(cr, uid, ids, context):
-            result_list.append({'id' : pick.id, 'partner_id': pick.partner_id.id})
-        return result_list
+    def push(self, cr, uid, order, connection, http_connection, case = None):
+        ''' purchase.order:push()
+        -------------------------
+        This method pushes a quotation to the given connection.
+        In case the quotation is older than 1 hour and we don't get a response
+        or the site is down, a helpdesk case is created or reopened.
+        ---------------------------------------------------------------------- '''
+
+        helpdesk_db = self.pool.get('crm.helpdesk')
+        log = logging.getLogger(None)
+        now = datetime.datetime.now()
+        created_at = datetime.datetime.strptime(order.create_date, '%Y-%m-%d %H:%M:%S')
+        error = False
+
+        # Convert the quotation to JSON and push it
+        # -----------------------------------------
+        content = self.edi_export(cr, uid, order)
+        content['urlCallback'] = ''.join([http_connection.url, 'purchaseOrder'])
+        try:
+            response = requests.post(connection.url, data=json.dumps(content))
+            if response.status_code == 200:
+                log.info('QUOTATION_PUSHER: Quotation {!s} was sent successfully.'.format(order.name))
+                self.write(cr, uid, order.id, {'quotation_sent_at': now})
+                return True
+            else:
+                error = response.status_code
+
+        except Exception as e:
+            error = str(e)
+
+        # If the code reaches this point, it means something went wrong
+        # -------------------------------------------------------------
+        log.warning('QUOTATION_PUSHER: Quotation {!s} was not sent. Error given was: {!s}'.format(order.name, error))
+        if created_at + datetime.timedelta(0,3600)  < now:
+            if not case:
+                helpdesk_db.create_simple_case(cr, uid, 'Quotation {!s} has been open for longer than an hour.'.format(order.name), self._PUSH_CODE, 'purchase.order,{!s}'.format(str(order.id)))
+            else:
+                helpdesk_db.case_reset(cr, uid, [case.id])
+        return True
 
 
 
-
-
-
-
-    def send_edi_out(self, cr, uid, items, context=None):
-        ''' purchase.order:send_edi_out()
-        ---------------------------------
-        This method will perform the export of a purchase
-        order, the simple version. Only PO's that
-        are in state 'draft' may be passed to this
-        method, otherwise an error will occur.
-        ------------------------------------------------- '''
-        edi_db = self.pool.get('clubit.tools.edi.document.outgoing')
-
-        # Get the selected items
-        # ----------------------
-        purchases = [x['id'] for x in items]
-        purchases = self.browse(cr, uid, purchases, context=context)
-
-
-        # Loop over all purchases to check if their
-        # collective states allow for EDI processing
-        # ------------------------------------------
-        nope = ""
-        for po in purchases:
-            if po.state != 'draft':
-                nope += po.name + ', '
-        if nope:
-            raise osv.except_osv(_('Warning!'), _("Not all documents had states 'draft'. Please exclude the following documents: {!s}").format(nope))
-
-
-        # Actual processing of all the purchases
-        # --------------------------------------
-        for po in purchases:
-            content = self.edi_export(cr, uid, po, None, context)
-            partner_id = [x['partner_id'] for x in items if x['id'] == po.id][0]
-            result = edi_db.create_from_content(cr, uid, po.name, content, partner_id, 'purchase.order', 'send_edi_out')
-            if result != True:
-                raise osv.except_osv(_('Error!'), _("Something went wrong while trying to create one of the EDI documents. Please contact your system administrator. Error given: {!s}").format(result))
-
-
-
-
-    def edi_export(self, cr, uid, po, edi_struct=None, context=None):
+    def edi_export(self, cr, uid, po, context=None):
         ''' purchase.order:edi_export()
         -------------------------------
         This method parses a given object to a JSON
@@ -255,6 +264,220 @@ class purchase_order(osv.Model):
         # Return the result
         # -----------------
         return edi_doc
+
+
+
+
+
+    def edi_import_validator(self, cr, uid, ids, context):
+        ''' purchase.order:edi_import_validator()
+            -------------------------------------
+            This method will perform a validation on the provided
+            EDI Document on a logical & functional level.
+            ----------------------------------------------------- '''
+
+        # Read the EDI Document
+        # ---------------------
+        edi_db = self.pool.get('clubit.tools.edi.document.incoming')
+        product_db = self.pool.get('product.product')
+        document = edi_db.browse(cr, uid, ids, context)
+
+        # Convert the document to JSON
+        # ----------------------------
+        try:
+            data = json.loads(document.content)
+            if not data:
+                edi_db.message_post(cr, uid, document.id, body='Error found: EDI Document is empty.')
+                return self.resolve_helpdesk_case(cr, uid, document)
+        except Exception:
+            edi_db.message_post(cr, uid, document.id, body='Error found: content is not valid JSON.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+
+        # Check if the minimum amount of customer information is provided
+        # ---------------------------------------------------------------
+        if 'SupplierReference' not in data:
+            edi_db.message_post(cr, uid, document.id, body='Error found: No email provided.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+        if not data['email']:
+            edi_db.message_post(cr, uid, document.id, body='Error found: No email provided.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+        if 'bill_address' not in data:
+            edi_db.message_post(cr, uid, document.id, body='Error found: bill_address structure is missing (our customer).')
+            return self.resolve_helpdesk_case(cr, uid, document)
+        if 'full_name' not in data['bill_address']:
+            edi_db.message_post(cr, uid, document.id, body='Error found: customer name was missing @ bill_address:full_name.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+        if not data['bill_address']['full_name']:
+            edi_db.message_post(cr, uid, document.id, body='Error found: customer name was missing @ bill_address:full_name.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+        if 'address1' not in data['bill_address']:
+            edi_db.message_post(cr, uid, document.id, body='Error found: customer address was missing @ bill_address:address1.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+        if not data['bill_address']['address1']:
+            edi_db.message_post(cr, uid, document.id, body='Error found: customer address was missing @ bill_address:address1.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+        if 'city' not in data['bill_address']:
+            edi_db.message_post(cr, uid, document.id, body='Error found: customer city was missing @ bill_address:city.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+        if not data['bill_address']['city']:
+            edi_db.message_post(cr, uid, document.id, body='Error found: customer city was missing @ bill_address:city.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+        if 'zipcode' not in data['bill_address']:
+            edi_db.message_post(cr, uid, document.id, body='Error found: customer zipcode was missing @ bill_address:zipcode.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+        if not data['bill_address']['zipcode']:
+            edi_db.message_post(cr, uid, document.id, body='Error found: customer zipcode was missing @ bill_address:zipcode.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+
+
+
+        # Validate the line items from this document
+        # ------------------------------------------
+        if 'line_items' not in data:
+            edi_db.message_post(cr, uid, document.id, body='Error found: No line items provided in this document.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+        if len(data['line_items']) == 0:
+            edi_db.message_post(cr, uid, document.id, body='Error found: No line items provided in this document.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+
+        for line in data['line_items']:
+            if 'price' not in line:
+                edi_db.message_post(cr, uid, document.id, body='Error found: line item with id {!s} did not have a price.'.format(line['id']))
+                return self.resolve_helpdesk_case(cr, uid, document)
+            if line['price'] == 0:
+                edi_db.message_post(cr, uid, document.id, body='Error found: line item with id {!s} did not have a price.'.format(line['id']))
+                return self.resolve_helpdesk_case(cr, uid, document)
+
+            if 'variant' not in line:
+                edi_db.message_post(cr, uid, document.id, body='Error found: line item with id {!s} did not structure "variant".'.format(line['id']))
+                return self.resolve_helpdesk_case(cr, uid, document)
+            if 'sku' not in line['variant']:
+                edi_db.message_post(cr, uid, document.id, body='Error found: line item with id {!s} did not have field "variant:sku (ean code)".'.format(line['id']))
+                return self.resolve_helpdesk_case(cr, uid, document)
+            if not line['variant']['sku']:
+                edi_db.message_post(cr, uid, document.id, body='Error found: line item with id {!s} did have an ean code.'.format(line['id']))
+                return self.resolve_helpdesk_case(cr, uid, document)
+
+            product = product_db.search(cr, uid, [('ean13', '=', line['variant']['sku'])])
+            if not product:
+                edi_db.message_post(cr, uid, document.id, body='Error found: line item with id {!s} had an unknown ean code.'.format(line['id']))
+                return self.resolve_helpdesk_case(cr, uid, document)
+            product = product_db.browse(cr, uid, product[0])
+            if not product.sale_ok:
+                edi_db.message_post(cr, uid, document.id, body='Error found: line item with id {!s} had an article that cannot be sold.'.format(line['id']))
+                return self.resolve_helpdesk_case(cr, uid, document)
+
+
+        # If we get all the way to here, the document is valid
+        # ----------------------------------------------------
+        return True
+
+
+
+    def edi_import_spree(self, cr, uid, ids, context):
+        ''' purchase.order:edi_import_spree()
+        -------------------------------------
+        This method will perform the actual import of the
+        provided EDI Document.
+        ------------------------------------------------- '''
+
+        # Attempt to validate the file right before processing
+        # ----------------------------------------------------
+        edi_db = self.pool.get('clubit.tools.edi.document.incoming')
+        if not self.edi_import_validator(cr, uid, ids, context):
+            edi_db.message_post(cr, uid, ids, body='Error found: during processing, the document was found invalid.')
+            return False
+
+
+        # Process the EDI Document
+        # ------------------------
+        document = edi_db.browse(cr, uid, ids, context)
+        name = self.process_edi_document(cr, uid, document, context)
+        if not name:
+            edi_db.message_post(cr, uid, ids, body='Error found: something went wrong while creating the sale order.')
+            return False
+        else:
+            edi_db.message_post(cr, uid, ids, body='Sale order {!s} created'.format(name))
+            return True
+
+
+
+    def process_edi_document(self, cr, uid, document, context):
+        ''' purchase.order:create_sale_order_spree()
+        --------------------------------------------
+        This method will create a sales order based
+        on the provided EDI input.
+        ------------------------------------------- '''
+
+        product_db = self.pool.get('product.product')
+        ir_model_db = self.pool.get('ir.model.data')
+        edi_db = self.pool.get('clubit.tools.edi.document.incoming')
+
+        # Check if the customer already exists, create it if it doesn't
+        # -------------------------------------------------------------
+        data = json.loads(document.content)
+        customer, message = self.resolve_customer(cr, uid, document.partner_id, data['bill_address'], data['email'])
+        if not customer:
+            edi_db.message_post(cr, uid, document.id, body='Error during processing: {!s}'.format(message))
+            return self.resolve_helpdesk_case(cr, uid, document)
+
+        payment = False
+        if data['payment_state'] == 'balance_due':
+            payment = ir_model_db.search(cr, uid, [('name','=', 'edi_payment_term2'), ('model', '=', 'account.payment.term')])
+        elif data['payment_state'] == 'pending':
+            payment = ir_model_db.search(cr, uid, [('name','=', 'edi_payment_term1'), ('model', '=', 'account.payment.term')])
+        if payment:
+            payment = ir_model_db.browse(cr, uid, payment[0]).res_id
+
+
+        # Prepare the call to create a sale order
+        # ---------------------------------------
+        vals = {
+            'partner_id'          : customer.id,
+            'partner_shipping_id' : customer.id,
+            'partner_invoice_id'  : customer.id,
+            'pricelist_id'        : customer.property_product_pricelist.id,
+            'origin'              : data['number'],
+            'date_order'          : data['created_at'][0:10],
+            'payment_term'        : payment,
+            'order_line'          : [],
+            'picking_policy'      : 'one',
+            'order_policy'        : 'picking'
+        }
+
+
+        for line in data['line_items']:
+
+            product = product_db.search(cr, uid, [('ean13', '=', line['variant']['sku'])])
+            product = product_db.browse(cr, uid, product[0])
+
+            detail = {
+                'product_uos_qty' : line['quantity'],
+                'product_uom_qty' : line['quantity'],
+                'product_id'      : product.id,
+                'type'            : product.procure_method,
+                'price_unit'      : line['price'],
+                'name'            : line['variant']['name'],
+                'th_weight'       : product.weight * line['quantity'],
+                'tax_id'          : [[6, False, self.pool.get('account.fiscal.position').map_tax(cr, uid, customer.property_account_position, product.taxes_id)   ]],
+            }
+
+            order_line = []
+            order_line.extend([0])
+            order_line.extend([False])
+            order_line.append(detail)
+            vals['order_line'].append(order_line)
+
+
+        # Actually create the sale order
+        # ------------------------------
+        order = self.create(cr, uid, vals, context=None)
+        if not order:
+            edi_db.message_post(cr, uid, document.id, body='Error during processing: could not create the sale order, unknown reason.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+        self.action_button_confirm(cr, uid, [order])
+        order = self.browse(cr, uid, order)
+        return order.name
 
 
 

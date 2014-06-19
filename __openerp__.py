@@ -22,7 +22,6 @@
         'config.xml',
         'settings.xml',
         'schedulers.xml',
-        'wizard/out_purchase_order_view.xml',
     ],
     'demo': [
     ],

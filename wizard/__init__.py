@@ -1,3 +1,2 @@
-import out_purchase_order
 import thr_masterdata
 import thr_product_combined

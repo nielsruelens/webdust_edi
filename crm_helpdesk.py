@@ -8,5 +8,5 @@ class crm_helpdesk(osv.Model):
     _inherit = "crm.helpdesk"
 
 
-    def create_simple_case(self, cr, uid, header, description):
-        return self.create(cr, uid, {'user_id': 6, 'name': header, 'description': description, 'categ_id': 2 })
+    def create_simple_case(self, cr, uid, header, description, reference=None):
+        return self.create(cr, uid, {'user_id': 6, 'name': header, 'description': description, 'categ_id': 2, 'ref' : reference })

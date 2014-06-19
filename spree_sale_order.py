@@ -160,9 +160,9 @@ class sale_order(osv.Model):
         # Check if the customer already exists, create it if it doesn't
         # -------------------------------------------------------------
         data = json.loads(document.content)
-        customer, message = self.resolve_customer(cr, uid, document.partner_id, data['bill_address'], data['email'])
-        if not customer:
-            edi_db.message_post(cr, uid, document.id, body='Error during processing: {!s}'.format(message))
+        billing_partner, shipping_partner = self.resolve_customer_info(cr, uid, data['bill_address'], data['ship_address'], data['email'])
+        if not billing_partner or not shipping_partner:
+            edi_db.message_post(cr, uid, document.id, body='Error during processing: could not find/create a billing/shipping partner')
             return self.resolve_helpdesk_case(cr, uid, document)
 
         payment = False
@@ -177,11 +177,11 @@ class sale_order(osv.Model):
         # Prepare the call to create a sale order
         # ---------------------------------------
         vals = {
-            'partner_id'          : customer.id,
-            'partner_shipping_id' : customer.id,
-            'partner_invoice_id'  : customer.id,
-            'pricelist_id'        : customer.property_product_pricelist.id,
-            'origin'              : data['number'],
+            'partner_id'          : shipping_partner.id,
+            'partner_shipping_id' : shipping_partner.id,
+            'partner_invoice_id'  : billing_partner.id,
+            'pricelist_id'        : shipping_partner.property_product_pricelist.id,
+            'client_order_ref'    : data['number'],
             'date_order'          : data['created_at'][0:10],
             'payment_term'        : payment,
             'order_line'          : [],
@@ -203,7 +203,7 @@ class sale_order(osv.Model):
                 'price_unit'      : line['price'],
                 'name'            : line['variant']['name'],
                 'th_weight'       : product.weight * line['quantity'],
-                'tax_id'          : [[6, False, self.pool.get('account.fiscal.position').map_tax(cr, uid, customer.property_account_position, product.taxes_id)   ]],
+                'tax_id'          : [[6, False, self.pool.get('account.fiscal.position').map_tax(cr, uid, shipping_partner.property_account_position, product.taxes_id)   ]],
             }
 
             order_line = []
@@ -228,54 +228,80 @@ class sale_order(osv.Model):
 
 
 
-    def resolve_customer(self, cr, uid, partner, customer, email):
+    def resolve_customer_info(self, cr, uid, billing_address, shipping_address, email):
 
-        ir_model_db = self.pool.get('ir.model.data')
         partner_db = self.pool.get('res.partner')
+        country_db = self.pool.get('res.country')
 
         # Check if this partner already exists
         # ------------------------------------
-        customer_id = ir_model_db.search(cr, uid, [('model', '=', 'res.partner'), ('module', '=', partner.name),('name', '=', customer['id'])])
-        if customer_id:
-            customer_id = ir_model_db.browse(cr, uid, customer_id[0])
-            return partner_db.browse(cr, uid, customer_id.res_id), False
+        billing_partner = partner_db.search(cr, uid, [('email', '=', email), ('parent_id','=',False)])
+        if billing_partner:
+            billing_partner = partner_db.browse(cr, uid, billing_partner[0])
 
-        # Partner doesn't exist yet, create it
-        # ------------------------------------
-        country_db = self.pool.get('res.country')
-        country_id = country_db.search(cr, uid, [('code', '=', customer['country']['iso'])])
-        if not country_id:
-            return False, 'Could not resolve country for customer'
+            # Check if the shipment address exists
+            # ------------------------------------
+            country_id = country_db.search(cr, uid, [('code', '=', shipping_address['country']['iso'])])
+            shipping_partner = False
+            partner_ids = partner_db.search(cr, uid, [('parent_id','=',billing_partner.id)])
+            if partner_ids:
+                for partner in partner_db.browse(cr, uid, partner_ids):
+                    if partner.city == shipping_address['city'] and partner.zip == shipping_address['zipcode'] and partner.street == shipping_address['address1'] and partner.street2 == shipping_address['address2'] and partner.country_id.id == country_id[0]:
+                        shipping_partner = partner
 
+            if shipping_partner:
+                return billing_partner, shipping_partner
+
+
+
+
+
+        # If the billing address doesn't exist yet, create it
+        # ----------------------------------------------------
+        if not billing_partner:
+            country_id = country_db.search(cr, uid, [('code', '=', billing_address['country']['iso'])])
+            vals = {
+                'active'     : True,
+                'customer'   : True,
+                'is_company' : False,
+                'city'       : billing_address['city'],
+                'zip'        : billing_address['zipcode'],
+                'street'     : billing_address['address1'],
+                'street2'    : billing_address['address2'],
+                'country_id' : country_id[0],
+                'email'      : email,
+                'mobile'     : billing_address['phone'],
+                'phone'      : billing_address['alternative_phone'],
+                'name'       : billing_address['full_name'],
+            }
+
+            billing_partner = partner_db.create(cr, uid, vals)
+            billing_partner = partner_db.browse(cr, uid, billing_partner)
+
+
+        # If the shipping address doesn't exist yet, create it
+        # ----------------------------------------------------
+        country_id = country_db.search(cr, uid, [('code', '=', shipping_address['country']['iso'])])
         vals = {
             'active'     : True,
             'customer'   : True,
             'is_company' : False,
-            'city'       : customer['city'],
-            'zip'        : customer['zipcode'],
-            'street'     : customer['address1'],
-            'street2'    : customer['address2'],
+            'city'       : shipping_address['city'],
+            'zip'        : shipping_address['zipcode'],
+            'street'     : shipping_address['address1'],
+            'street2'    : shipping_address['address2'],
             'country_id' : country_id[0],
-            'email'      : email,
-            'mobile'     : customer['phone'],
-            'phone'      : customer['alternative_phone'],
-            'name'       : customer['full_name'],
+            'parent_id'  : billing_partner.id,
+            'mobile'     : shipping_address['phone'],
+            'phone'      : shipping_address['alternative_phone'],
+            'name'       : shipping_address['full_name'],
         }
 
-        customer_id = partner_db.create(cr, uid, vals)
-        customer_id = partner_db.browse(cr, uid, customer_id)
+        shipping_partner = partner_db.create(cr, uid, vals)
+        shipping_partner = partner_db.browse(cr, uid, shipping_partner)
 
 
-        # Create the external reference for future lookup
-        # -----------------------------------------------
-        vals = {
-            'model'  : 'res.partner',
-            'module' : partner.name,
-            'res_id' : customer_id.id,
-            'name'   : customer['id']
-        }
-        ir_model_db.create(cr, uid, vals)
-        return customer_id, False
+        return billing_partner, shipping_partner
 
 
 

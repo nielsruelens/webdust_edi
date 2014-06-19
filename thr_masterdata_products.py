@@ -277,7 +277,7 @@ class product(osv.Model):
             new_prop['name'] = next((x['id'] for x in self.properties if x['name'] == self.header[i]),None)
             if not new_prop['name']:
                 continue
-            new_prop['value'] = prop
+            new_prop['value'] = prop.capitalize()
             vals['properties'].append([0,False,new_prop])
 
 
@@ -365,12 +365,12 @@ class product(osv.Model):
             property = next((x for x in product.properties if x.name.id == prop_id),None)
             if not property:
                 new_prop = {}
-                new_prop['value'] = prop
+                new_prop['value'] = prop.capitalize()
                 new_prop['name'] = prop_id
                 vals['properties'].append([0,False,new_prop])
             else:
-                if property.value != prop:
-                    prop_db.write(cr, uid, property.id, {'value' : prop}, context=None)
+                if property.value != prop.capitalize():
+                    prop_db.write(cr, uid, property.id, {'value' : prop.capitalize()}, context=None)
         if not vals['properties']:
             del vals['properties']
 
