@@ -166,7 +166,7 @@ class product(osv.Model):
             # ------------------------------------------------------------------
             self.log.info('UPLOAD_THR-PRODUCTS: reading pre-existing products.')
             prod_ids = self.search(new_cr, uid, [('ean13', 'in', [ x[1] for x in content ])])
-            all_existing = self.browse(new_cr, uid, prod_ids, context=context)
+            all_existing = self.read(new_cr, uid, prod_ids, ['id', 'ean13', 'categ_id', 'seller_ids', 'properties'], context=context)
 
 
             # Process all the products
@@ -175,7 +175,7 @@ class product(osv.Model):
                 i = i + 1
 
                 self.log.info('UPLOAD_THR-PRODUCTS: processing product with EAN {!s} ({!s} of {!s})'.format(line[1], i, len(content)))
-                existing = next((x for x in all_existing if x.ean13 == line[1]), None)
+                existing = next((x for x in all_existing if x['ean13'] == line[1]), None)
 
                 # Commit every 200 products to make sure
                 # lost work in case of problems is limited
@@ -326,12 +326,13 @@ class product(osv.Model):
 
         if 'categ_id' in vals:
             vals['categ_id'] = next((x['id'] for x in self.categories if x['code'] == vals['categ_id']),None)
-        if vals['categ_id'] == product.categ_id.id:
+        if vals['categ_id'] == product['categ_id'][0]:
             del vals['categ_id']
 
         # THR product code
         # ----------------
-        seller = next((x for x in product.seller_ids if x.name.id == self.thr),None)
+        sellers = supplier_db.read(cr, uid, product['seller_ids'])
+        seller = next((x for x in sellers if x['name'][0] == self.thr),None)
         if not seller:
             supplier = {}
             supplier['name'] = self.thr
@@ -339,12 +340,12 @@ class product(osv.Model):
             supplier['product_code'] = line[0]
             vals['seller_ids'] =  [(0, False, supplier)]
         else:
-            if seller.product_code != line[0]:
-                supplier_db.write(cr, uid, seller.id, {'product_code' : line[0]}, context=None)
+            if seller['product_code'] != line[0]:
+                supplier_db.write(cr, uid, seller['id'], {'product_code' : line[0]}, context=None)
 
         # Images
         # ------
-        image_ids = image_db.search(cr, uid, [('product_id','=',product.id),('supplier','=',self.thr)])
+        image_ids = image_db.search(cr, uid, [('product_id','=',product['id']),('supplier','=',self.thr)])
         if image_ids: image_db.unlink(cr, uid, image_ids)
         vals['images'] = []
         for image in line[14:24]:
@@ -356,21 +357,22 @@ class product(osv.Model):
         # Properties
         # ----------
         vals['properties'] = []
+        properties = prop_db.read(cr, uid, product['properties'])
         for i, prop in enumerate(line):
             if i < 24 or not prop:
                 continue
             prop_id = next((x['id'] for x in self.properties if x['name'] == self.header[i]),None)
             if not prop_id:
                 continue
-            property = next((x for x in product.properties if x.name.id == prop_id),None)
+            property = next((x for x in properties if x['name'][0] == prop_id),None)
             if not property:
                 new_prop = {}
                 new_prop['value'] = prop.capitalize()
                 new_prop['name'] = prop_id
                 vals['properties'].append([0,False,new_prop])
             else:
-                if property.value != prop.capitalize():
-                    prop_db.write(cr, uid, property.id, {'value' : prop.capitalize()}, context=None)
+                if property['value'] != prop.capitalize():
+                    prop_db.write(cr, uid, property['id'], {'value' : prop.capitalize()}, context=None)
         if not vals['properties']:
             del vals['properties']
 
@@ -378,7 +380,7 @@ class product(osv.Model):
         vals['short_description'] = line[12]
         vals['description'] = line[13]
         vals['recommended_price'] = line[24]
-        return {'id' : self.write(cr, uid, [product.id], vals, context=None)}
+        return {'id' : self.write(cr, uid, [product['id']], vals, context=None)}
 
 
 

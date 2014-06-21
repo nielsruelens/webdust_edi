@@ -161,8 +161,7 @@ class product(osv.Model):
         # Process the products
         # --------------------
         if not param or param['load_products']:
-            prod_db = self.pool.get('product.product')
-            prod_db.upload_thr_master_detail(cr, uid, content, context=context)
+            self.upload_thr_master_detail(cr, uid, content, context=context)
 
         self.log.info('UPLOAD_THR: masterdata upload complete.')
         return True
