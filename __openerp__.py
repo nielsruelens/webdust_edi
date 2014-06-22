@@ -17,6 +17,7 @@
     'data': [
         'wizard/thr_masterdata_view.xml',
         'wizard/thr_product_combined_view.xml',
+        'wizard/quotations_out_view.xml',
         'purchase_view.xml',
         'category_view.xml',
         'config.xml',

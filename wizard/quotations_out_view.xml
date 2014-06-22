@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+    <data>
+
+        <record id="view_quotations_out" model="ir.ui.view">
+            <field name="name">Send out quotations</field>
+            <field name="model">webdust.quotations.out</field>
+            <field name="arch" type="xml">
+                <form string="Send out quotations" version="7.0">
+                    <footer>
+                        <button name="start" string="Start" type="object"  class="oe_highlight"  />
+                        or
+                        <button string="Cancel" class="oe_link" special="cancel" />
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+         <act_window name="Send quotations"
+            res_model="webdust.quotations.out"
+            src_model="purchase.order"
+            view_mode="form"
+            target="new"
+            key2="client_action_multi"
+            id="action_webdust_quotations_out"/>
+
+    </data>
+</openerp>

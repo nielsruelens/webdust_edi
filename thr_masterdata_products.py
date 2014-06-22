@@ -247,9 +247,10 @@ class product(osv.Model):
             return {'rejection': 'Product {!s} rejected because category is unknown.'.format(vals['ean13'])}
 
 
-        vals['name'] = ' '.join((line[41], line[40], line[42]))
-        if not vals['name']:
+        if not line[41] and not line[40] and not line[42]:
             return {'rejection': 'Product {!s} rejected because name could not be determined.'.format(vals['ean13'])}
+
+        vals['name'] = ' '.join((line[41], line[40], line[42]))
 
         # THR product code
         # ----------------
@@ -307,9 +308,10 @@ class product(osv.Model):
         image_db = self.pool.get('webdust.image')
 
 
-        vals['name'] = ' '.join((line[41], line[40], line[42]))
-        if not vals['name']:
-            del vals['name']
+        if line[41] or line[40] or line[42]:
+            vals['name'] = ' '.join((line[41], line[40], line[42]))
+        else:
+            vals['name'] = line[39].capitalize()
 
         # Determine the category
         # ----------------------
