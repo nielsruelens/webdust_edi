@@ -146,9 +146,9 @@ class product(osv.Model):
                 # Add the availability data
                 # -------------------------
                 vals = { 'state' : 'unavailable' }
-                if line[2] == 'Voorradig':
+                if line[2] >= 5:
                     vals['state'] = 'available'
-                elif line[2] == 'Beperkt voorradig':
+                elif line[2] >= 2:
                     vals['state'] = 'limited'
 
                 # write the new state to the record through product!
