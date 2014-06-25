@@ -12,6 +12,6 @@ class clubit_tools_edi_document_incoming(osv.Model):
         -------------------------------------------------------------------- '''
         result = super(clubit_tools_edi_document_incoming, self).create_from_web_request(cr, uid, partner, flow, reference, content, data_type)
         if isinstance(result, basestring):
-            description = 'These are the request parameters:\n partner: {!s} \n flow: {!s} \n reference: {!s} \n content: {!s} \n data_type: {!s}'.format(partner, flow, reference, content, data_type)
+            description = 'These are the request parameters:\n partner: {!s} \n flow: {!s} \n reference: {!s} \n content: {!s} \n data_type: {!s}'.format(partner, flow, reference, content.eoncode('utf8'), data_type)
             self.pool.get('crm.helpdesk').create_simple_case( cr, uid, 'Something went wrong when accepting an HTTP request', description )
         return result

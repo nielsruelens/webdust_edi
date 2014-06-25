@@ -169,7 +169,7 @@ class purchase_order(osv.Model):
         content = self.edi_export(cr, uid, order)
         content['urlCallback'] = ''.join([http_connection.url, 'purchaseOrder'])
         try:
-            response = requests.post(connection.url, data=json.dumps(content))
+            response = requests.put(connection.url, headers={'content-type': 'application/json'}, data=json.dumps(content), auth=(connection.user, connection.password))
             if response.status_code == 200:
                 log.info('QUOTATION_PUSHER: Quotation {!s} was sent successfully.'.format(order.name))
                 self.write(cr, uid, order.id, {'quotation_sent_at': now})
@@ -188,6 +188,10 @@ class purchase_order(osv.Model):
                 helpdesk_db.create_simple_case(cr, uid, 'Quotation {!s} has been open for longer than an hour.'.format(order.name), self._PUSH_CODE, 'purchase.order,{!s}'.format(str(order.id)))
             else:
                 helpdesk_db.case_reset(cr, uid, [case.id])
+        return True
+
+
+    def pull(self, cr, uid, order, connection):
         return True
 
 
@@ -252,9 +256,9 @@ class purchase_order(osv.Model):
 
             edi_line = {
                 'positionID'    : line.id,
-                'articleNumber' : line.product_id.ean13,
+                'articleNumber' : line.product_id.ean13,  #'1061706'
                 'articleName'   : line.product_id.name,
-                'quantity'      : line.product_qty,
+                'quantity'      : int(line.product_qty),
                 'unitPrice'     : line.price_unit,
                 'positionPrice' : line.price_subtotal,
             }
@@ -293,41 +297,26 @@ class purchase_order(osv.Model):
             edi_db.message_post(cr, uid, document.id, body='Error found: content is not valid JSON.')
             return self.resolve_helpdesk_case(cr, uid, document)
 
-        # Check if the minimum amount of customer information is provided
-        # ---------------------------------------------------------------
-        if 'SupplierReference' not in data:
-            edi_db.message_post(cr, uid, document.id, body='Error found: No email provided.')
+        # Check if the supplierReference is provided and exists
+        # -----------------------------------------------------
+        if 'supplierReference' not in data:
+            edi_db.message_post(cr, uid, document.id, body='Error found: supplierReference is not provided.')
             return self.resolve_helpdesk_case(cr, uid, document)
-        if not data['email']:
-            edi_db.message_post(cr, uid, document.id, body='Error found: No email provided.')
+
+        order_id = self.search(cr, uid, [('name','=', data['supplierReference'])])
+        if not order_id:
+            edi_db.message_post(cr, uid, document.id, body='Error found: supplierReference {!s} is unknown.'.format(data['supplierReference']))
             return self.resolve_helpdesk_case(cr, uid, document)
-        if 'bill_address' not in data:
-            edi_db.message_post(cr, uid, document.id, body='Error found: bill_address structure is missing (our customer).')
+
+
+        # Since THR doesn't give us all the data, we need to enrich this EDI document by pulling the latest version
+        # ---------------------------------------------------------------------------------------------------------
+        settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
+        rest_info = [x for x in settings.connections if x.name == 'THR_REST_PO']
+        if not rest_info:
+            edi_db.message_post(cr, uid, document.id, body='Error found: THR_REST_PO service is missing in our customizing!')
             return self.resolve_helpdesk_case(cr, uid, document)
-        if 'full_name' not in data['bill_address']:
-            edi_db.message_post(cr, uid, document.id, body='Error found: customer name was missing @ bill_address:full_name.')
-            return self.resolve_helpdesk_case(cr, uid, document)
-        if not data['bill_address']['full_name']:
-            edi_db.message_post(cr, uid, document.id, body='Error found: customer name was missing @ bill_address:full_name.')
-            return self.resolve_helpdesk_case(cr, uid, document)
-        if 'address1' not in data['bill_address']:
-            edi_db.message_post(cr, uid, document.id, body='Error found: customer address was missing @ bill_address:address1.')
-            return self.resolve_helpdesk_case(cr, uid, document)
-        if not data['bill_address']['address1']:
-            edi_db.message_post(cr, uid, document.id, body='Error found: customer address was missing @ bill_address:address1.')
-            return self.resolve_helpdesk_case(cr, uid, document)
-        if 'city' not in data['bill_address']:
-            edi_db.message_post(cr, uid, document.id, body='Error found: customer city was missing @ bill_address:city.')
-            return self.resolve_helpdesk_case(cr, uid, document)
-        if not data['bill_address']['city']:
-            edi_db.message_post(cr, uid, document.id, body='Error found: customer city was missing @ bill_address:city.')
-            return self.resolve_helpdesk_case(cr, uid, document)
-        if 'zipcode' not in data['bill_address']:
-            edi_db.message_post(cr, uid, document.id, body='Error found: customer zipcode was missing @ bill_address:zipcode.')
-            return self.resolve_helpdesk_case(cr, uid, document)
-        if not data['bill_address']['zipcode']:
-            edi_db.message_post(cr, uid, document.id, body='Error found: customer zipcode was missing @ bill_address:zipcode.')
-            return self.resolve_helpdesk_case(cr, uid, document)
+        rest_info = rest_info[0]
 
 
 
