@@ -90,6 +90,7 @@ class purchase_order(osv.Model):
         if not rest_info:
             log.warning('QUOTATION_PUSHER: Could not find the THR_REST_PO connection settings, creating CRM helpdesk case.')
             helpdesk_db.create_simple_case(cr, uid, 'An error occurred during the MRP/EDI Quotation pusher.', 'Missing THR_REST_PO connection in the EDI settings')
+            cr.commit()
             return True
         rest_info = rest_info[0]
 
@@ -97,6 +98,7 @@ class purchase_order(osv.Model):
         if not http_info:
             log.warning('QUOTATION_PUSHER: Could not find the HTTP_EDI_SERVER connection settings, creating CRM helpdesk case.')
             helpdesk_db.create_simple_case(cr, uid, 'An error occurred during the MRP/EDI Quotation pusher.', 'Missing HTTP_EDI_SERVER connection in the EDI settings')
+            cr.commit()
             return True
         http_info = http_info[0]
 
@@ -109,6 +111,7 @@ class purchase_order(osv.Model):
             log.warning('QUOTATION_PUSHER: Connection is not available! Creating a helpdesk case and aborting process.')
             helpdesk_db.create_simple_case(cr, uid, 'MRP/EDI Quotation pusher: connection is down.',
                                                     'Could not connect to {!s}, cannot push quotations! \nError given is {!s}'.format(rest_info.url, str(e)))
+            cr.commit()
             return True
 
 
@@ -145,6 +148,7 @@ class purchase_order(osv.Model):
             log.info('QUOTATION_PUSHER: Pushing quotation {!s}.'.format(order.name))
             self.push(cr, uid, order, rest_info, http_info, case)
 
+        cr.commit()
         log.info('QUOTATION_PUSHER: Processing is done.')
         return True
 
