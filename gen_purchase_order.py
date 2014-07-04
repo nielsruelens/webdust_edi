@@ -178,6 +178,7 @@ class purchase_order(osv.Model):
             if response.status_code == 200:
                 log.info('QUOTATION_PUSHER: Quotation {!s} was sent successfully.'.format(order.name))
                 self.write(cr, uid, order.id, {'quotation_sent_at': now})
+                self.create_outgoing_edi_document(cr, uid, content)
                 return True
             else:
                 error = response.status_code
@@ -509,7 +510,33 @@ class purchase_order(osv.Model):
 
 
 
+    def create_outgoing_edi_document(self, cr, uid, content):
 
+        edi_db = self.pool.get('clubit.tools.edi.document.outgoing')
+        partner_id = self.pool.get('res.partner').search(cr, uid, [('name', '=', 'THR')])
+
+
+        # Find the correct EDI flow
+        # -------------------------
+        model_db = self.pool.get('ir.model.data')
+        flow_id = model_db.search(cr, uid, [('name', '=', 'edi_thr_purchase_order_out'), ('model','=','clubit.tools.edi.flow')])
+        if not flow_id: return False
+        flow_id = model_db.browse(cr, uid, flow_id)[0]
+        flow_id = flow_id.res_id
+
+        # Create the document
+        # -------------------
+        values = {
+            'name'       : content['supplierReference'],
+            'reference'  : content['supplierReference'],
+            'partner_id' : partner_id,
+            'flow_id'    : flow_id,
+            'content'    : content,
+            'state'      : 'new',
+            'location'   : 'null',
+        }
+
+        edi_db.create(cr, uid, values)
 
 
 
