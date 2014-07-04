@@ -529,7 +529,7 @@ class purchase_order(osv.Model):
         values = {
             'name'       : content['supplierReference'],
             'reference'  : content['supplierReference'],
-            'partner_id' : partner_id,
+            'partner_id' : partner_id[0],
             'flow_id'    : flow_id,
             'content'    : content,
             'state'      : 'new',
