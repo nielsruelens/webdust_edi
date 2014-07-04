@@ -83,6 +83,7 @@ class purchase_order(osv.Model):
         proc_db.run_scheduler(cr, uid, False, True)
 
 
+
         # Make sure the required customizing is present
         # ---------------------------------------------
         settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
@@ -196,6 +197,21 @@ class purchase_order(osv.Model):
 
 
     def pull(self, cr, uid, order, connection):
+        ''' purchase.order:pull()
+        -------------------------
+        This method pulls the most recent data from THR.
+        ------------------------------------------------ '''
+
+        try:
+            response = requests.get('/'.join([connection.url,order.name]), auth=(connection.user, connection.password))
+            if response.status_code == 200:
+                return response.content
+            else:
+                return False
+
+        except Exception as e:
+            return False
+
         return True
 
 
@@ -260,7 +276,7 @@ class purchase_order(osv.Model):
 
             edi_line = {
                 'positionID'    : line.id,
-                'articleNumber' : line.product_id.ean13,  #'1061706'
+                'articleNumber' : line.product_id.ean13,
                 'articleName'   : line.product_id.name,
                 'quantity'      : int(line.product_qty),
                 'unitPrice'     : line.price_unit,
@@ -311,7 +327,7 @@ class purchase_order(osv.Model):
         if not order_id:
             edi_db.message_post(cr, uid, document.id, body='Error found: supplierReference {!s} is unknown.'.format(data['supplierReference']))
             return self.resolve_helpdesk_case(cr, uid, document)
-
+        order = self.browse(cr, uid, order_id[0])
 
         # Since THR doesn't give us all the data, we need to enrich this EDI document by pulling the latest version
         # ---------------------------------------------------------------------------------------------------------
@@ -322,10 +338,28 @@ class purchase_order(osv.Model):
             return self.resolve_helpdesk_case(cr, uid, document)
         rest_info = rest_info[0]
 
+        # Actually perform the pull
+        # -------------------------
+        result = self.pull(cr, uid, order, rest_info)
+        if result == False:
+            edi_db.message_post(cr, uid, document.id, body='Error occurred: could not pull the latest data from THR.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+        else:
+            try:
+                data = json.loads(result)
+                if not data:
+                    edi_db.message_post(cr, uid, document.id, body='Error found: EDI Document is empty.')
+                    return self.resolve_helpdesk_case(cr, uid, document)
+            except Exception:
+                edi_db.message_post(cr, uid, document.id, body='Error found: content is not valid JSON.')
+                return self.resolve_helpdesk_case(cr, uid, document)
+        edi_db.write(cr, uid, document.id, {'content' : result})
 
 
-        # Validate the line items from this document
-        # ------------------------------------------
+
+
+        # Validate the document now that it contains the most recent data
+        # ---------------------------------------------------------------
         if 'line_items' not in data:
             edi_db.message_post(cr, uid, document.id, body='Error found: No line items provided in this document.')
             return self.resolve_helpdesk_case(cr, uid, document)
@@ -477,6 +511,29 @@ class purchase_order(osv.Model):
 
 
 
+
+
+
+    def resolve_helpdesk_case(self, cr, uid, document):
+
+        helpdesk_db = self.pool.get('crm.helpdesk')
+        case = helpdesk_db.search(cr, uid, [('ref','=','{!s},{!s}'.format(document._table_name, document.id))])
+        if case:
+            case = helpdesk_db.browse(cr, uid, case[0])
+            if case.state == 'done':
+                helpdesk_db.case_reset(cr, uid, [case.id])
+
+        if not case:
+            vals = {
+                'partner_id' : document.partner_id.id,
+                'user_id'    : uid,
+                'ref'        : '{!s},{!s}'.format(document._table_name, document.id),
+                'name'       : 'Manual action required for EDI document #{!s}'.format(document.name)
+            }
+            case = helpdesk_db.create(cr, uid, vals)
+            case = helpdesk_db.browse(cr, uid, case)
+
+        return False
 
 
 
