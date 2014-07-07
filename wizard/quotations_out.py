@@ -21,3 +21,12 @@ class webdust_quotations_out(osv.TransientModel):
         return {'type': 'ir.actions.act_window_close'}
 
 
+class webdust_quotations_out_manual(osv.TransientModel):
+    _name = 'webdust.quotations.out.manual'
+    _description = 'Class to immediately call the quotation push service'
+
+    def start(self, cr, uid, ids, context=None):
+        ids = context.get('active_ids', [])
+        po_db = self.pool.get('purchase.order')
+        po_db.push_quotations_manual(cr, uid, ids)
+        return {'type': 'ir.actions.act_window_close'}

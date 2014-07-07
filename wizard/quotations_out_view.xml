@@ -2,11 +2,33 @@
 <openerp>
     <data>
 
+        <record id="view_quotations_out_manual" model="ir.ui.view">
+            <field name="name">(Re)send quotations manually</field>
+            <field name="model">webdust.quotations.out.manual</field>
+            <field name="arch" type="xml">
+                <form string="Send out quotations manually" version="7.0">
+                    <footer>
+                        <button name="start" string="Start" type="object" class="oe_highlight" />
+                        or
+                        <button string="Cancel" class="oe_link" special="cancel" />
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+         <act_window name="(Re)send quotations manually"
+            res_model="webdust.quotations.out.manual"
+            src_model="purchase.order"
+            view_mode="form"
+            target="new"
+            key2="client_action_multi"
+            id="action_webdust_quotations_out_manual"/>
+
         <record id="view_quotations_out" model="ir.ui.view">
-            <field name="name">Send out quotations</field>
+            <field name="name">MRP/Quotation Pusher</field>
             <field name="model">webdust.quotations.out</field>
             <field name="arch" type="xml">
-                <form string="Send out quotations" version="7.0">
+                <form string="MRP/Quotation Pusher" version="7.0">
                     <footer>
                         <button name="start" string="Start" type="object"  class="oe_highlight"  />
                         or
@@ -16,7 +38,7 @@
             </field>
         </record>
 
-         <act_window name="Send quotations"
+         <act_window name="MRP/Quotation Pusher"
             res_model="webdust.quotations.out"
             src_model="purchase.order"
             view_mode="form"

@@ -1,7 +1,7 @@
 from openerp.osv import osv,fields
 from openerp.tools.translate import _
 import logging
-import json, requests, datetime
+import json, requests, datetime, time
 
 class purchase_order(osv.Model):
     _name = "purchase.order"
@@ -60,6 +60,25 @@ class purchase_order(osv.Model):
 #
 #        return lowest_supplier
 
+    def copy(self, cr, uid, id, default=None, context=None):
+        ''' purchase.order:copy_data
+            ------------------------
+            The quotation_sent_at field cannot be copied during a duplication
+            ----------------------------------------------------------------- '''
+        default['quotation_sent_at'] = False
+        return super(purchase_order, self).copy(cr, uid, id, default, context)
+
+
+    def push_quotations_manual(self, cr, uid, ids):
+        ''' purchase.order:push_quotations_manual()
+        --------------------------------------------
+        This method is used by the PO selection view to send or resend
+        quotations as EDI messages.
+        -------------------------------------------------------------- '''
+        orders = self.browse(cr, uid, ids)
+        if orders: return self.push_several(cr, uid, orders)
+        return False
+
 
     def push_quotations(self, cr, uid):
         ''' purchase.order:push_quotations()
@@ -75,7 +94,6 @@ class purchase_order(osv.Model):
         log.info('QUOTATION_PUSHER: Starting processing on the quotation pusher.')
 
         proc_db = self.pool.get('procurement.order')
-        helpdesk_db = self.pool.get('crm.helpdesk')
 
         # Run the MRP Scheduler
         # ---------------------
@@ -83,6 +101,23 @@ class purchase_order(osv.Model):
         proc_db.run_scheduler(cr, uid, False, True)
 
 
+        # Search for documents that need to be sent
+        # -----------------------------------------
+        log.info('QUOTATION_PUSHER: Searching for quotations to send.')
+        pids = self.search(cr, uid, [('state', '=', 'draft'), ('quotation_sent_at', '=', False)])
+        if not pids:
+            log.info('QUOTATION_PUSHER: No quotations found. Processing is done.')
+            return True
+
+        log.info('QUOTATION_PUSHER: Sending the following POs: {!s}'.format(str(pids)))
+        orders = self.browse(cr, uid, pids)
+        return self.push_several(cr, uid, orders)
+
+
+    def push_several(self, cr, uid, orders):
+
+        log = logging.getLogger(None)
+        helpdesk_db = self.pool.get('crm.helpdesk')
 
         # Make sure the required customizing is present
         # ---------------------------------------------
@@ -116,17 +151,6 @@ class purchase_order(osv.Model):
             return True
 
 
-        # Search for documents that need to be sent
-        # -----------------------------------------
-        log.info('QUOTATION_PUSHER: Searching for quotations to send.')
-        pids = self.search(cr, uid, [('state', '=', 'draft'), ('quotation_sent_at', '=', False)])
-        if not pids:
-            log.info('QUOTATION_PUSHER: No quotations found. Processing is done.')
-            return True
-
-        log.info('QUOTATION_PUSHER: Sending the following POs: {!s}'.format(str(pids)))
-        orders = self.browse(cr, uid, pids)
-
 
         # Process every quotation
         # -----------------------
@@ -147,7 +171,7 @@ class purchase_order(osv.Model):
             # Push this order
             # ---------------
             log.info('QUOTATION_PUSHER: Pushing quotation {!s}.'.format(order.name))
-            self.push(cr, uid, order, rest_info, http_info, case)
+            self.push_single(cr, uid, order, rest_info, http_info, case)
 
         cr.commit()
         log.info('QUOTATION_PUSHER: Processing is done.')
@@ -155,9 +179,10 @@ class purchase_order(osv.Model):
 
 
 
-    def push(self, cr, uid, order, connection, http_connection, case = None):
-        ''' purchase.order:push()
-        -------------------------
+
+    def push_single(self, cr, uid, order, connection, http_connection, case = None):
+        ''' purchase.order:push_single()
+        --------------------------------
         This method pushes a quotation to the given connection.
         In case the quotation is older than 1 hour and we don't get a response
         or the site is down, a helpdesk case is created or reopened.
@@ -531,7 +556,7 @@ class purchase_order(osv.Model):
             'reference'  : content['supplierReference'],
             'partner_id' : partner_id[0],
             'flow_id'    : flow_id,
-            'content'    : content,
+            'content'    : json.dumps(content),
             'state'      : 'new',
             'location'   : 'null',
         }
