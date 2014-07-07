@@ -204,7 +204,7 @@ class purchase_order(osv.Model):
         ------------------------------------------------ '''
 
         try:
-            response = requests.get('/'.join([connection.url,order.name]), auth=(connection.user, connection.password))
+            response = requests.get('/'.join([connection.url,order.partner_ref]), auth=(connection.user, connection.password))
             if response.status_code == 200:
                 return response.content
             else:
@@ -237,7 +237,7 @@ class purchase_order(osv.Model):
         edi_doc = {
             'shopID'            : '1',
             'resellerID'        : '1',
-            'supplierReference' : po.name,
+            'supplierReference' : po.partner_ref,
             'shipmentProvider'  : 'GLS',
             'deliveryMethod'    : '1',
             'amountUntaxed'     : po.amount_untaxed,
