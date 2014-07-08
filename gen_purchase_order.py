@@ -1,7 +1,29 @@
 from openerp.osv import osv,fields
 from openerp.tools.translate import _
-import logging
+from itertools import groupby
+import logging, inspect
 import json, requests, datetime, time
+
+#       +-------------------------+     +-------------------+
+#       |  push_quotations_manual |     |  push_quotations  |
+#       |-------------------------|     |-------------------|
+#       |    pushes a # of ids    |     | calls MRP run     |
+#       |    (from tree view)     |     | gathers ids of new|
+#       |                         |     | docs              |
+#       +-------------+-----------+     | (from scheduler)  |
+#                     |                 +---------+---------+
+#                     |                           |
+#                     |                           |
+#                     +---------------------------+
+#                     |
+#          +----------+----------+
+#          |     push_several    |       +--------------------+
+#          |---------------------|       |     push_single    |
+#          | validate customizing|       |--------------------|
+#          | test connection     |       | convert to JSON    |
+#          | loop quotations     +-------> actually push      |
+#          |                     |       | create log EDI doc |
+#          +---------------------+       +--------------------+
 
 class purchase_order(osv.Model):
     _name = "purchase.order"
@@ -60,12 +82,24 @@ class purchase_order(osv.Model):
 #
 #        return lowest_supplier
 
+    def create(self, cr, uid, vals, context=None):
+        ''' purchase.order:create()
+        ---------------------------
+        This method is overwritten to make sure auto_edi_allowed
+        is marked as true, *if* the PO is made using the MRP scheduler.
+        --------------------------------------------------------------- '''
+        stack = inspect.stack()
+        if stack[1][3] == 'create_procurement_purchase_order':
+            vals['auto_edi_allowed'] = True
+        return super(purchase_order, self).create(cr, uid, vals, context)
+
     def copy(self, cr, uid, id, default=None, context=None):
         ''' purchase.order:copy_data
             ------------------------
             The quotation_sent_at field cannot be copied during a duplication
             ----------------------------------------------------------------- '''
         default['quotation_sent_at'] = False
+        default['auto_edi_allowed'] = False
         return super(purchase_order, self).copy(cr, uid, id, default, context)
 
 
@@ -92,7 +126,6 @@ class purchase_order(osv.Model):
 
         log = logging.getLogger(None)
         log.info('QUOTATION_PUSHER: Starting processing on the quotation pusher.')
-
         proc_db = self.pool.get('procurement.order')
 
         # Run the MRP Scheduler
@@ -104,7 +137,7 @@ class purchase_order(osv.Model):
         # Search for documents that need to be sent
         # -----------------------------------------
         log.info('QUOTATION_PUSHER: Searching for quotations to send.')
-        pids = self.search(cr, uid, [('state', '=', 'draft'), ('quotation_sent_at', '=', False)])
+        pids = self.search(cr, uid, [('state', '=', 'draft'), ('quotation_sent_at', '=', False), ('auto_edi_allowed','=', True)])
         if not pids:
             log.info('QUOTATION_PUSHER: No quotations found. Processing is done.')
             return True
@@ -115,6 +148,33 @@ class purchase_order(osv.Model):
 
 
     def push_several(self, cr, uid, orders):
+
+        log = logging.getLogger(None)
+        helpdesk_db = self.pool.get('crm.helpdesk')
+
+        # Group the orders by partner so each EDI flow only has to run once
+        # -----------------------------------------------------------------
+        for partner, group in groupby(orders, lambda x: x.partner_id):
+
+                # Does this partner listen to an outgoing PO EDI flow?
+                # ----------------------------------------------------
+                flow = [x for x in partner.edi_flows if x.flow_id.model == 'purchase.order' and x.flow_id.direction == 'out']
+                if not flow: continue
+
+                # Call the EDI method for this flow
+                # ---------------------------------
+                method = getattr(self, flow[0].flow_id.method)
+                if not method: continue
+                try:
+                    method(cr, uid, group)
+                except Exception as e:
+                    helpdesk_db.create_simple_case(cr, uid, 'A serious error occurred in pushSeveral trying to call the EDI method.', str(e))
+        cr.commit()
+        return True
+
+
+
+    def push_several_thr(self, cr, uid, orders):
 
         log = logging.getLogger(None)
         helpdesk_db = self.pool.get('crm.helpdesk')
@@ -171,7 +231,7 @@ class purchase_order(osv.Model):
             # Push this order
             # ---------------
             log.info('QUOTATION_PUSHER: Pushing quotation {!s}.'.format(order.name))
-            self.push_single(cr, uid, order, rest_info, http_info, case)
+            self.push_single_thr(cr, uid, order, rest_info, http_info, case)
 
         cr.commit()
         log.info('QUOTATION_PUSHER: Processing is done.')
@@ -179,8 +239,7 @@ class purchase_order(osv.Model):
 
 
 
-
-    def push_single(self, cr, uid, order, connection, http_connection, case = None):
+    def push_single_thr(self, cr, uid, order, connection, http_connection, case = None):
         ''' purchase.order:push_single()
         --------------------------------
         This method pushes a quotation to the given connection.

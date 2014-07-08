@@ -23,6 +23,7 @@
 			<field name="name">Purchase Order(out)</field>
 			<field name="direction">out</field>
 			<field name="model">purchase.order</field>
+			<field name="method">push_several_thr</field>
 		</record>
 		<record id="edi_thr_purchase_order_in" model="clubit.tools.edi.flow">
 			<field name="name">Purchase Order(in)</field>
