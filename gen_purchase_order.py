@@ -156,18 +156,26 @@ class purchase_order(osv.Model):
         # -----------------------------------------------------------------
         for partner, group in groupby(orders, lambda x: x.partner_id):
 
+                log.info('QUOTATION_PUSHER: Pushing quotations for {!s}'.format(partner.name))
+
                 # Does this partner listen to an outgoing PO EDI flow?
                 # ----------------------------------------------------
                 flow = [x for x in partner.edi_flows if x.flow_id.model == 'purchase.order' and x.flow_id.direction == 'out']
-                if not flow: continue
+                if not flow:
+                    log.info('QUOTATION_PUSHER: {!s} did not have a processing method(), skipping partner'.format(partner.name))
+                    continue
 
                 # Call the EDI method for this flow
                 # ---------------------------------
                 method = getattr(self, flow[0].flow_id.method)
-                if not method: continue
+                if not method:
+                    log.info('QUOTATION_PUSHER: {!s} did not have a processing method(), skipping partner'.format(partner.name))
+                    continue
+
                 try:
                     method(cr, uid, group)
                 except Exception as e:
+                    log.warning('QUOTATION_PUSHER: A serious error occurred during processing for partner {!s}'.format(partner.name))
                     helpdesk_db.create_simple_case(cr, uid, 'A serious error occurred in pushSeveral trying to call the EDI method.', str(e))
         cr.commit()
         return True
