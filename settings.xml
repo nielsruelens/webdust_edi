@@ -1,6 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <openerp>
     <data>
+
+
+        <record id="clubit_tools_settings_root_category_form" model="ir.ui.view">
+            <field name="name">clubit.tools.settings.root.category.form</field>
+            <field name="model">clubit.tools.settings.root.category</field>
+            <field name="priority">1</field>
+            <field name="arch" type="xml">
+                <form string="Root Category" version="7.0">
+                    <group>
+	                    <field name="partner_id"/>
+	                    <field name="category_id"/>
+                	</group>
+                </form>
+            </field>
+        </record>
+
         <record id="webdust_edi_settings_form" model="ir.ui.view">
             <field name="name">webdust.edi.settings.form</field>
             <field name="model">clubit.tools.settings</field>
@@ -16,6 +32,15 @@
                         <field
                             domain="[('type_tax_use','=','purchase')]" name="purchase_low_tax_id"/>
                     </group>
+
+                    <separator string="Root Categories"/>
+                    <field name="root_categories">
+		                <tree string="Root Categories">
+		                    <field name="partner_id"/>
+		                    <field name="category_id"/>
+		                </tree>
+					</field>
+
                 </field>
             </field>
         </record>
