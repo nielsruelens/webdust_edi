@@ -28,6 +28,11 @@ class product_category(osv.Model):
         performance.
         """
 
+        settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
+        root_category = [x for x in settings.root_categories if x.partner_id.name == 'THR']
+        if root_category: root_category = root_category[0].category_id.id
+
+
         self.log.info('UPLOAD_THR-CATEGORIES: starting on the categories.')
         self.log.info('UPLOAD_THR-CATEGORIES: removing duplicate entries from input.')
         categories = set(tuple(element) for element in categories)
@@ -48,7 +53,7 @@ class product_category(osv.Model):
             #level 4 6:8
             #level 5 8:10
 
-            parent = 0
+            parent = root_category
             my_loc = 0
             if level != 1:
                 my_loc = level * 2 - 2
@@ -75,6 +80,7 @@ class product_category(osv.Model):
                     (vals['code'], vals['name']) = cat
 
                     # there's a parent node
+                    vals['parent_id'] = parent
                     if level > 1:
                         code = next(x[parent] for x in categories if x[my_loc] == cat[0])
                         vals['parent_id'] = processed[code]
