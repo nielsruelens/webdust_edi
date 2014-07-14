@@ -19,6 +19,7 @@
         'wizard/thr_product_combined_view.xml',
         'wizard/quotations_out_view.xml',
         'purchase_view.xml',
+        'sale_order_view.xml',
         'category_view.xml',
         'config.xml',
         'settings.xml',

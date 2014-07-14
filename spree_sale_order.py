@@ -1,4 +1,4 @@
-from openerp.osv import osv
+from openerp.osv import osv, fields
 import json
 from openerp.tools.translate import _
 
@@ -6,6 +6,10 @@ from openerp.tools.translate import _
 class sale_order(osv.Model):
     _name = "sale.order"
     _inherit = "sale.order"
+
+    _columns = {
+        'desired_delivery_date': fields.date('Desired Delivery Date'),
+    }
 
 
     def edi_import_validator(self, cr, uid, ids, context):
@@ -188,6 +192,9 @@ class sale_order(osv.Model):
             'picking_policy'      : 'one',
             'order_policy'        : 'picking'
         }
+
+        if data['customer_delivery_date']:
+            vals['desired_delivery_date'] = data['customer_delivery_date'][0:10]
 
 
         for line in data['line_items']:
