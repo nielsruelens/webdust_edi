@@ -1,7 +1,7 @@
 from openerp.osv import osv,fields
 from openerp.tools.translate import _
 from itertools import groupby
-import logging, inspect
+import logging
 import json, requests, datetime, time
 
 #       +-------------------------+     +-------------------+
@@ -88,10 +88,16 @@ class purchase_order(osv.Model):
         This method is overwritten to make sure auto_edi_allowed
         is marked as true, *if* the PO is made using the MRP scheduler.
         --------------------------------------------------------------- '''
-        stack = inspect.stack()
-        if stack[1][3] == 'create_procurement_purchase_order':
-            vals['auto_edi_allowed'] = True
+        if context:
+            if 'mrp_scheduler' in context:
+                vals['auto_edi_allowed'] = True
         return super(purchase_order, self).create(cr, uid, vals, context)
+
+    def write(self, cr, uid, ids, vals, context=None):
+        if context:
+            if 'mrp_scheduler' in context:
+                vals['auto_edi_allowed'] = True
+        return super(purchase_order, self).write(cr, uid,ids, vals, context)
 
     def copy(self, cr, uid, id, default=None, context=None):
         ''' purchase.order:copy_data
