@@ -1,5 +1,5 @@
 from openerp.osv import osv, fields
-import json
+import json, datetime
 from openerp.tools.translate import _
 
 
@@ -8,7 +8,7 @@ class sale_order(osv.Model):
     _inherit = "sale.order"
 
     _columns = {
-        'desired_delivery_date': fields.date('Desired Delivery Date'),
+        'desired_delivery_date': fields.datetime('Desired Delivery Date'),
     }
 
 
@@ -193,8 +193,10 @@ class sale_order(osv.Model):
             'order_policy'        : 'picking'
         }
 
-        if data['customer_delivery_date']:
+        if 'customer_delivery_date' in data:
             vals['desired_delivery_date'] = data['customer_delivery_date'][0:10]
+        else:
+            vals['desired_delivery_date'] = (datetime.datetime.now()+datetime.timedelta(days=2)).strftime('%Y-%m-%d %H:%M:%S')
 
 
         for line in data['line_items']:

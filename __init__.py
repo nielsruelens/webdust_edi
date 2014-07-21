@@ -12,3 +12,4 @@ import thr_pricing
 import thr_availability
 import settings
 import spree_sale_order
+import spree_product_manager

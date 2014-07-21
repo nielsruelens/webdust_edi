@@ -91,7 +91,17 @@ class purchase_order(osv.Model):
         if context:
             if 'mrp_scheduler' in context:
                 vals['auto_edi_allowed'] = True
+
+        if vals['origin']:
+            sale_db = self.pool.get('sale.order')
+            sale_order = sale_db.search(cr, uid, [('name','=',vals['origin'])])
+            if sale_order:
+                sale_order = sale_db.read(cr, uid, sale_order, ['desired_delivery_date'], context=context)[0]
+                if sale_order['desired_delivery_date']:
+                    for i, line in enumerate(vals['order_line']):
+                        line[2]['date_planned'] = sale_order['desired_delivery_date']
         return super(purchase_order, self).create(cr, uid, vals, context)
+
 
     def write(self, cr, uid, ids, vals, context=None):
         if context:
