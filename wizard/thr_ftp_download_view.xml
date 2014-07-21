@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+    <data>
+
+        <record id="view_thr_ftp_downloader_manual" model="ir.ui.view">
+            <field name="name">THR FTP Downloader</field>
+            <field name="model">webdust.thr.ftp.download</field>
+            <field name="arch" type="xml">
+                <form string="THR FTP Downloader" version="7.0">
+                    <footer>
+                        <button name="start" string="Start" type="object" class="oe_highlight" />
+                        or
+                        <button string="Cancel" class="oe_link" special="cancel" />
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+         <act_window name="THR FTP Downloader"
+            res_model="webdust.thr.ftp.download"
+            src_model="product.product"
+            view_mode="form"
+            target="new"
+            key2="client_action_multi"
+            id="action_thr_ftp_downloader"/>
+
+    </data>
+</openerp>

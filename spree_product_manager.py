@@ -36,7 +36,7 @@ class product_product(osv.Model):
                 'description' : product['description'],
                 'sku'         : product['ean13'],
                 'price'       : product['list_price'],
-                'cost_price'  : product['standard_price'],
+                'cost_price'  : product['cost_price'],
                 'shipping_category_id' : 1,
             }, 'interface_name': 'handig'}
             if product['sale_ok']:

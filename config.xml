@@ -81,6 +81,9 @@
         <menuitem action="action_thr_masterdata"
             groups="clubit_tools.clubit_tools_edi_user"
             id="menu_thr_masterdata" parent="menu_webdust_manual_edi_actions"/>
+        <menuitem action="action_thr_ftp_downloader"
+            groups="clubit_tools.clubit_tools_edi_user"
+            id="menu_thr_ftp_downloader" parent="menu_webdust_manual_edi_actions"/>
         <menuitem action="action_webdust_quotations_out"
             groups="clubit_tools.clubit_tools_edi_user"
             id="menu_quotations_out" parent="menu_webdust_manual_edi_actions"/>

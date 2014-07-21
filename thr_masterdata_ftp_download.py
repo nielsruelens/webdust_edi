@@ -87,7 +87,7 @@ class product(osv.Model):
         log.info('THR_FTP: downloading...')
         for f in files:
             # The masterdata file
-            if f[-1][:11] == 'export_pim_':
+            if 'full_export' in f[-1]:
 
                 try:
                     path = join('EDI', cr.dbname, 'THR_product_upload', 'export_pim_handig.csv')
@@ -101,7 +101,7 @@ class product(osv.Model):
 
 
 
-            elif f[-1][:10] == 'thr_stock_':
+            elif 'thr_stock_' in f[-1]:
 
                 try:
                     path = join('EDI', cr.dbname, str(ftp_info.partner.id), str(flow_id), f[-1])
