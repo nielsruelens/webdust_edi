@@ -24,9 +24,7 @@ class webdust_property(osv.Model):
         prop_ids = self.search(cr, uid, [('name', 'in', [ x for x in content ])])
         all_existing = self.browse(cr, uid, prop_ids, context=context)
 
-        for i, column in enumerate(content):
-            if i < 24:
-                continue
+        for column in content:
             self.log.info('UPLOAD_THR-PROPERTIES: processing property {!s}'.format(column))
             existing = next((x for x in all_existing if x.name == column), None) #next() only returns 1st result of enumeration
             if not existing:

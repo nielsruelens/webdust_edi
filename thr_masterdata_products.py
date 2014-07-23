@@ -17,6 +17,7 @@ class product(osv.Model):
     categories = []
 
     header = []
+    indexes = {}
     invalid = []
     warnings = []
 
@@ -30,6 +31,7 @@ class product(osv.Model):
         self.properties = []
         self.categories = []
         self.header = []
+        self.indexes = {}
         self.invalid = []
         self.warnings = []
 
@@ -66,6 +68,17 @@ class product(osv.Model):
         return True
 
 
+    def get_file_column_indexes(self, cr, uid):
+
+        self.indexes['product_code'] = self.header.index('ProductID')
+        self.indexes['ean13'] = self.header.index('EANcode')
+        self.indexes['name'] = self.header.index('Korte Omschrijving')
+        self.indexes['long_description'] = self.header.index('Lange Omschrijving')
+        self.indexes['first_category'] = self.header.index('Classificatie Niveau 1')
+        self.indexes['first_image'] = self.header.index('Bestand Afbeelding 1')
+        self.indexes['recommended_price'] = self.header.index('Consumentenadviesprijs (incl)')
+        return True
+
 
     def upload_thr_master_detail(self, cr, uid, content, context=None):
         ''' product.product:upload_thr_master_detail()
@@ -96,6 +109,7 @@ class product(osv.Model):
 
         # Get all the property & category definitions
         # -------------------------------------------
+        self.get_file_column_indexes(cr, uid)
         self.get_all_properties(cr, uid)
         self.get_all_categories(cr, uid)
 
@@ -106,11 +120,11 @@ class product(osv.Model):
         # ------------------------------------------------------------
         self.log.info('UPLOAD_THR-PRODUCTS: checking if all the EAN codes are 13 chars long.')
         for i, line in enumerate(content):
-            if len(line[1]) < 13:
-                warning = 'UPLOAD_THR-PRODUCTS: adding missing leading zeroes to EAN {!s}'.format(line[1])
+            if len(line[self.indexes['ean13']]) < 13:
+                warning = 'UPLOAD_THR-PRODUCTS: adding missing leading zeroes to EAN {!s}'.format(line[self.indexes['ean13']])
                 self.log.warning(warning)
                 self.warnings.append(warning)
-                line[1] = '0' * (13-len(line[1])) + line[1]
+                line[1] = '0' * (13-len(line[self.indexes['ean13']])) + line[self.indexes['ean13']]
                 content[i+1] = line
 
 
@@ -165,7 +179,7 @@ class product(osv.Model):
             # Get all the ids + content for all the products that already exist.
             # ------------------------------------------------------------------
             self.log.info('UPLOAD_THR-PRODUCTS: reading pre-existing products.')
-            prod_ids = self.search(new_cr, uid, [('ean13', 'in', [ x[1] for x in content ])])
+            prod_ids = self.search(new_cr, uid, [('ean13', 'in', [ x[self.indexes['ean13']] for x in content ])])
             all_existing = self.read(new_cr, uid, prod_ids, ['id', 'ean13', 'categ_id', 'seller_ids', 'properties'], context=context)
 
 
@@ -174,14 +188,16 @@ class product(osv.Model):
             for i, line in enumerate(content):
                 i = i + 1
 
-                self.log.info('UPLOAD_THR-PRODUCTS: processing product with EAN {!s} ({!s} of {!s})'.format(line[1], i, len(content)))
-                existing = next((x for x in all_existing if x['ean13'] == line[1]), None)
+                self.log.info('UPLOAD_THR-PRODUCTS: processing product with EAN {!s} ({!s} of {!s})'.format(line[self.indexes['ean13']], i, len(content)))
+                existing = next((x for x in all_existing if x['ean13'] == line[self.indexes['ean13']]), None)
 
                 # Commit every 200 products to make sure
                 # lost work in case of problems is limited
                 # ----------------------------------------
                 if i % 200 == 0:
                     new_cr.commit()
+                    new_cr.closse()
+                    return True
 
 
                 # Creation of a new product
@@ -220,24 +236,24 @@ class product(osv.Model):
 
         # Check if the EAN is valid
         # -------------------------
-        if line[1] and check_ean(line[1]):
-            vals['ean13'] = line[1]
+        if line[self.indexes['ean13']] and check_ean(line[self.indexes['ean13']]):
+            vals['ean13'] = line[self.indexes['ean13']]
         else:
-            return {'rejection': 'Product {!s} rejected because EAN is invalid.'.format(line[1])}
+            return {'rejection': 'Product {!s} rejected because EAN is invalid.'.format(line[self.indexes['ean13']])}
 
 
         # Determine the category
         # ----------------------
-        if line[10]:
-            vals['categ_id'] = line[10]
-        elif line[8]:
-            vals['categ_id'] = line[8]
-        elif line[6]:
-            vals['categ_id'] = line[6]
-        elif line[4]:
-            vals['categ_id'] = line[4]
-        elif line[2]:
-            vals['categ_id'] = line[2]
+        if line[self.indexes['first_category']+8]:
+            vals['categ_id'] = line[self.indexes['first_category']+8]
+        elif line[self.indexes['first_category']+6]:
+            vals['categ_id'] = line[self.indexes['first_category']+6]
+        elif line[self.indexes['first_category']+4]:
+            vals['categ_id'] = line[self.indexes['first_category']+4]
+        elif line[self.indexes['first_category']+2]:
+            vals['categ_id'] = line[self.indexes['first_category']+2]
+        elif line[self.indexes['first_category']]:
+            vals['categ_id'] = line[self.indexes['first_category']]
         else:
             return {'rejection': 'Product {!s} rejected because category is not provided.'.format(vals['ean13'])}
 
@@ -247,23 +263,24 @@ class product(osv.Model):
             return {'rejection': 'Product {!s} rejected because category is unknown.'.format(vals['ean13'])}
 
 
-        if not line[41] and not line[40] and not line[42]:
+        vals['name'] = line[self.indexes['name']].capitalize()
+        if not vals['name']:
             return {'rejection': 'Product {!s} rejected because name could not be determined.'.format(vals['ean13'])}
 
-        vals['name'] = ' '.join((line[41], line[40], line[42]))
+
 
         # THR product code
         # ----------------
         supplier = {}
         supplier['name'] = self.thr
         supplier['min_qty'] = 1
-        supplier['product_code'] = line[0]
+        supplier['product_code'] = line[self.indexes['product_code']]
         vals['seller_ids'] =  [(0, False, supplier)]
 
         # Images
         # ------
         vals['images'] = []
-        for image in line[14:24]:
+        for image in line[self.indexes['first_image']:self.indexes['first_image']+10]:
             if image:
                 vals['images'].append([0,False,{'supplier' : self.thr, 'url':image}])
 
@@ -272,7 +289,7 @@ class product(osv.Model):
         # ----------
         vals['properties'] = []
         for i, prop in enumerate(line):
-            if i < 24 or not prop:
+            if i <= self.indexes['recommended_price'] or not prop:
                 continue
             new_prop = {}
             new_prop['name'] = next((x['id'] for x in self.properties if x['name'] == self.header[i]),None)
@@ -282,12 +299,12 @@ class product(osv.Model):
             vals['properties'].append([0,False,new_prop])
 
 
-        vals['short_description'] = line[12]
-        vals['description'] = line[13]
+        vals['short_description'] = line[self.indexes['name']]
+        vals['description'] = line[self.indexes['long_description']]
         vals['procure_method'] = 'make_to_order'
         vals['type'] = 'product'
         vals['state'] = 'draft'
-        vals['recommended_price'] = line[24]
+        vals['recommended_price'] = line[self.indexes['recommended_price']]
         return {'id' : self.create(cr, uid, vals, context=None)}
 
 
@@ -308,23 +325,21 @@ class product(osv.Model):
         image_db = self.pool.get('webdust.image')
 
 
-        if line[41] or line[40] or line[42]:
-            vals['name'] = ' '.join((line[41], line[40], line[42]))
-        else:
-            vals['name'] = line[39].capitalize()
+        if line[self.indexes['name']]:
+            vals['name'] = line[self.indexes['name']].capitalize()
 
         # Determine the category
         # ----------------------
-        if line[10]:
-            vals['categ_id'] = line[10]
-        elif line[8]:
-            vals['categ_id'] = line[8]
-        elif line[6]:
-            vals['categ_id'] = line[6]
-        elif line[4]:
-            vals['categ_id'] = line[4]
-        elif line[2]:
-            vals['categ_id'] = line[2]
+        if line[self.indexes['first_category']+8]:
+            vals['categ_id'] = line[self.indexes['first_category']+8]
+        elif line[self.indexes['first_category']+6]:
+            vals['categ_id'] = line[self.indexes['first_category']+6]
+        elif line[self.indexes['first_category']+4]:
+            vals['categ_id'] = line[self.indexes['first_category']+4]
+        elif line[self.indexes['first_category']+2]:
+            vals['categ_id'] = line[self.indexes['first_category']+2]
+        elif line[self.indexes['first_category']]:
+            vals['categ_id'] = line[self.indexes['first_category']]
 
         if 'categ_id' in vals:
             vals['categ_id'] = next((x['id'] for x in self.categories if x['code'] == vals['categ_id']),None)
@@ -339,18 +354,18 @@ class product(osv.Model):
             supplier = {}
             supplier['name'] = self.thr
             supplier['min_qty'] = 1
-            supplier['product_code'] = line[0]
+            supplier['product_code'] = line[self.indexes['product_code']]
             vals['seller_ids'] =  [(0, False, supplier)]
         else:
             if seller['product_code'] != line[0]:
-                supplier_db.write(cr, uid, seller['id'], {'product_code' : line[0]}, context=None)
+                supplier_db.write(cr, uid, seller['id'], {'product_code' : line[self.indexes['product_code']]}, context=None)
 
         # Images
         # ------
         image_ids = image_db.search(cr, uid, [('product_id','=',product['id']),('supplier','=',self.thr)])
         if image_ids: image_db.unlink(cr, uid, image_ids)
         vals['images'] = []
-        for image in line[14:24]:
+        for image in line[self.indexes['first_image']:self.indexes['first_image']+10]:
             if image:
                 vals['images'].append([0,False,{'supplier' : self.thr, 'url':image}])
 
@@ -361,7 +376,7 @@ class product(osv.Model):
         vals['properties'] = []
         properties = prop_db.read(cr, uid, product['properties'])
         for i, prop in enumerate(line):
-            if i < 24 or not prop:
+            if i <= self.indexes['recommended_price'] or not prop:
                 continue
             prop_id = next((x['id'] for x in self.properties if x['name'] == self.header[i]),None)
             if not prop_id:
@@ -379,9 +394,9 @@ class product(osv.Model):
             del vals['properties']
 
 
-        vals['short_description'] = line[12]
-        vals['description'] = line[13]
-        vals['recommended_price'] = line[24]
+        vals['short_description'] = line[self.indexes['name']]
+        vals['description'] = line[self.indexes['long_description']]
+        vals['recommended_price'] = line[self.indexes['recommended_price']]
         return {'id' : self.write(cr, uid, [product['id']], vals, context=None)}
 
 

@@ -47,6 +47,42 @@ class product(osv.Model):
                 content.append(row)
         return content
 
+    def validate_thr_file(self, cr, uid, content):
+
+        self.log.error('UPLOAD_THR: Validating file...')
+        check = ['ProductID',
+                 'EANcode',
+                 'Classificatie Niveau 1',
+                 'Classificatie Niveau 2',
+                 'Classificatie Niveau 3',
+                 'Classificatie Niveau 4',
+                 'Classificatie Niveau 5',
+                 'Classificatie Niveau 1 omschrijving',
+                 'Classificatie Niveau 2 omschrijving',
+                 'Classificatie Niveau 3 omschrijving',
+                 'Classificatie Niveau 4 omschrijving',
+                 'Classificatie Niveau 5 omschrijving',
+                 'Korte Omschrijving',
+                 'Lange Omschrijving',
+                 'Bestand Afbeelding 1',
+                 'Bestand Afbeelding 2',
+                 'Bestand Afbeelding 3',
+                 'Bestand Afbeelding 4',
+                 'Bestand Afbeelding 5',
+                 'Bestand Afbeelding 6',
+                 'Bestand Afbeelding 7',
+                 'Bestand Afbeelding 8',
+                 'Bestand Afbeelding 9',
+                 'Bestand Afbeelding 10',
+                 'Consumentenadviesprijs (incl)',
+                 ]
+
+        ok = True
+        for x in check:
+            if x not in content[0]:
+                self.log.error('UPLOAD_THR: could not find column: {!s}'.format(x))
+                ok = False
+        return ok
 
 
     def upload_thr_master_from_file(self, cr, uid, param=None, context=None):
@@ -70,6 +106,11 @@ class product(osv.Model):
         # Read the file and send it for processing
         # ----------------------------------------
         content = self.read_thr_file(cr, uid, root_path)
+        if not self.validate_thr_file(cr, uid, content):
+            self.log.info('UPLOAD_THR: The file contained structural errors, aborting process.')
+            return False
+
+
         self.upload_thr_master(cr, uid, param, content, context)
 
         # If errors occurred, they will be stored in attribute self.result
@@ -136,7 +177,7 @@ class product(osv.Model):
 
         self.clear_globals(cr, uid)
         if not content:
-            self.log.info('UPLOAD_THR: masterdata upload complete.')
+            self.log.info('UPLOAD_THR: no content provided to process.')
             return True
 
         self.settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
@@ -145,17 +186,21 @@ class product(osv.Model):
             return True
 
         # Process the categories, exclude the header
+        # Find the index of the 1st category column
         # ------------------------------------------
         if not param or param['load_categories']:
             cat_db = self.pool.get('product.category')
-            cat_db.upload_thr(cr, uid, [ x[2:12] for x in content[1:] ], context=context)
+            i = content[0].index('Classificatie Niveau 1')
+            cat_db.upload_thr(cr, uid, [ x[i:i+10] for x in content[1:] ], context=context)
 
 
         # Process the properties
-        # ----------------------
+        # Find the index of the 1st property column
+        # -----------------------------------------
         if not param or param['load_properties']:
             prop_db = self.pool.get('webdust.property')
-            prop_db.upload_thr(cr, uid, content[0], context=context)
+            i = content[0].index('Bestand Afbeelding 10')+1
+            prop_db.upload_thr(cr, uid, content[0][i:], context=context)
 
 
         # Process the products
