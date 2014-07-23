@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+    <data>
+
+        <record id="view_webdust_product_save_all" model="ir.ui.view">
+            <field name="name">Mass save all products</field>
+            <field name="model">webdust.product.save.all</field>
+            <field name="arch" type="xml">
+                <form string="Mass save all products" version="7.0">
+                    <footer>
+                        <button name="start" string="Start" type="object" class="oe_highlight" />
+                        or
+                        <button string="Cancel" class="oe_link" special="cancel" />
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+         <act_window name="Mass save all products"
+            res_model="webdust.product.save.all"
+            src_model="product.product"
+            view_mode="form"
+            target="new"
+            key2="client_action_multi"
+            id="action_product_save_all"/>
+
+    </data>
+</openerp>

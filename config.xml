@@ -87,5 +87,8 @@
         <menuitem action="action_webdust_quotations_out"
             groups="clubit_tools.clubit_tools_edi_user"
             id="menu_quotations_out" parent="menu_webdust_manual_edi_actions"/>
+        <menuitem action="action_product_save_all"
+            groups="clubit_tools.clubit_tools_edi_user"
+            id="menu_product_save_all" parent="menu_webdust_manual_edi_actions"/>
     </data>
 </openerp>

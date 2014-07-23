@@ -196,8 +196,6 @@ class product(osv.Model):
                 # ----------------------------------------
                 if i % 200 == 0:
                     new_cr.commit()
-                    new_cr.closse()
-                    return True
 
 
                 # Creation of a new product

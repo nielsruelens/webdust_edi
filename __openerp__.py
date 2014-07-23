@@ -19,6 +19,7 @@
         'wizard/thr_product_combined_view.xml',
         'wizard/quotations_out_view.xml',
         'wizard/thr_ftp_download_view.xml',
+        'wizard/product_save_all.xml',
         'purchase_view.xml',
         'sale_order_view.xml',
         'category_view.xml',
