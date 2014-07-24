@@ -12,7 +12,12 @@ class webdust_product_save_all(osv.TransientModel):
         log.info('MASS-PRODUCT-SAVE: saving every single product. This is gonna take a while')
         prod_db = self.pool.get('product.product')
         new_cr = pooler.get_db(cr.dbname).cursor()
-        prod_db.write(new_cr, uid, prod_db.search(new_cr, uid, [], context=context), {}, context=context)
+
+        products = prod_db.search(new_cr, uid, [], context=context)
+        for i in xrange(0, len(products), 1000):
+            log.info('MASS-PRODUCT-SAVE: saving products {!s} to {!s} of {!s}.'.format(i,i+1000, len(products)))
+            prod_db.write(new_cr, uid, products[i:i+1000], {}, context=context)
+
         new_cr.commit()
         new_cr.close()
         log.info('MASS-PRODUCT-SAVE: mass save is complete.')

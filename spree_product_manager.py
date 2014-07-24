@@ -6,12 +6,12 @@ import json
 from openerp.tools.translate import _
 
 
-class product_product(osv.Model):
+class spree_product_manager(osv.Model):
     _name = "product.product"
     _inherit = "product.product"
 
     def write(self, cr, uid, ids, vals, context=None):
-        result = super(product_product, self).write(cr, uid,ids, vals, context)
+        result = super(spree_product_manager, self).write(cr, uid,ids, vals, context)
 
         # Read customizing
         # ----------------
@@ -25,17 +25,23 @@ class product_product(osv.Model):
 
         # Collect and push
         # ----------------
-        products = self.read(cr, uid, ids, ['id', 'name', 'description', 'ean13', 'list_price', 'standard_price', 'sale_ok'], context=context)
+        products = self.read(cr, uid, ids, ['id', 'name', 'description', 'ean13', 'list_price', 'cost_price', 'sale_ok'], context=context)
 
         calls = []
         for product in products:
             url = '{!s}/{!s}/{!s}'.format(connection.url, str(product['id']), 'push')
             header = {'content-type': 'application/json', connection.user: connection.password}
+
+            price = self.pool.get('product.pricelist').price_get(cr, uid, [connection.partner.property_product_pricelist.id],
+                                                                          product['id'],
+                                                                          1.0,
+                                                                          connection.partner.id,
+                                                                          { 'uom': 1, 'date': datetime.datetime.today().strftime('%Y-%m-%d'), })[connection.partner.property_product_pricelist.id]
             param = { 'product' : {
                 'name'        : product['name'],
                 'description' : product['description'],
                 'sku'         : product['ean13'],
-                'price'       : product['list_price'],
+                'price'       : price or product['cost_price']*1.45,
                 'cost_price'  : product['cost_price'],
                 'shipping_category_id' : 1,
             }, 'interface_name': 'handig'}
