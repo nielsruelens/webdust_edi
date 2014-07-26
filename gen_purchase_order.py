@@ -283,14 +283,27 @@ class purchase_order(osv.Model):
         content['urlCallback'] = ''.join([http_connection.url, 'purchaseOrder'])
         try:
             response = requests.put(connection.url, headers={'content-type': 'application/json'}, data=json.dumps(content), auth=(connection.user, connection.password))
-            if response.status_code == 200:
-                log.info('QUOTATION_PUSHER: Quotation {!s} was sent successfully.'.format(order.name))
-                self.write(cr, uid, order.id, {'quotation_sent_at': now})
-                self.create_outgoing_edi_document(cr, uid, content)
-                return True
+            if response.status_code != 200:
+                error = 'QUOTATION_PUSHER: Quotation {!s} was not sent. HTTP code {!s} received with response: {!s}'.format(order.name, response.status_code, response.content)
+                log.warning(error)
             else:
-                error = response.status_code
+                response_content = json.loads(response.content)
 
+                if 'status' not in response_content or 'orderId' not in response_content:
+                    error = 'QUOTATION_PUSHER: Quotation {!s} was sent, but received a response that didnt tell us the status: {!s}'.format(order.name, response.content)
+                    log.warning(error)
+                elif response_content['status'] != '1':
+                    error = 'QUOTATION_PUSHER: Quotation {!s} was sent, but it was rejected, response: {!s}'.format(order.name, response.content)
+                    log.warning(error)
+                else:
+                    log.info('QUOTATION_PUSHER: Quotation {!s} was sent successfully.'.format(order.name))
+                    self.write(cr, uid, order.id, {'quotation_sent_at': now})
+                    self.create_outgoing_edi_document(cr, uid, content)
+                    return True
+
+        except ValueError as e:
+            error = 'QUOTATION_PUSHER: Quotation {!s} was sent, but the response was not valid JSON. Response: {!s}.'.format(order.name, response.content)
+            log.warning(error)
         except Exception as e:
             error = str(e)
 
