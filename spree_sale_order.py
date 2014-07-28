@@ -255,7 +255,7 @@ class sale_order(osv.Model):
             partner_ids = partner_db.search(cr, uid, [('parent_id','=',billing_partner.id)])
             if partner_ids:
                 for partner in partner_db.browse(cr, uid, partner_ids):
-                    if partner.city == shipping_address['city'] and partner.zip == shipping_address['zipcode'] and partner.street == shipping_address['address1'] and partner.street2 == shipping_address['address2'] and partner.country_id.id == country_id[0]:
+                    if partner.name == shipping_address['full_name'] and partner.city == shipping_address['city'] and partner.zip == shipping_address['zipcode'] and partner.street == shipping_address['address1'] and partner.street2 == shipping_address['address2'] and partner.country_id.id == country_id[0]:
                         shipping_partner = partner
 
             if shipping_partner:
