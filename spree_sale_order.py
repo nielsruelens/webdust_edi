@@ -193,7 +193,7 @@ class sale_order(osv.Model):
             'order_policy'        : 'picking'
         }
 
-        if 'customer_delivery_date' in data:
+        if 'customer_delivery_date' in data and data['customer_delivery_date']:
             vals['desired_delivery_date'] = data['customer_delivery_date'][0:10]
         else:
             vals['desired_delivery_date'] = (datetime.datetime.now()+datetime.timedelta(days=2)).strftime('%Y-%m-%d %H:%M:%S')
