@@ -16,7 +16,7 @@
             </field>
         </record>
 
-         <act_window name="Products (from THR)"
+         <act_window name="Masterdata + Availability (from THR)"
             res_model="thr.product.combined"
             src_model="product.product"
             view_mode="form"

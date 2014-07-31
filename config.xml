@@ -64,15 +64,6 @@
 			<field name="name">EDI Outgoing</field>
 		</record>
 
-
-
-        <record id="webdust_handig_nl" model="res.partner">
-            <field name="name">Handig.nl</field>
-        </record>
-        <record id="webdust_handig_be" model="res.partner">
-            <field name="name">Handig.be</field>
-        </record>
-
         <menuitem groups="clubit_tools.clubit_tools_edi_user"
             id="menu_webdust_manual_edi_actions" name="EDI Actions" parent="clubit_tools.menu_clubit_tools"/>
         <menuitem action="action_thr_product_combined"

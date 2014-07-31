@@ -1,0 +1,5 @@
+<openerp>
+  <data>
+    <function model="webdust.edi.post.install" name="finalize_installation"/>
+  </data>
+</openerp>

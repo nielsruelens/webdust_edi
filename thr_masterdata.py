@@ -1,9 +1,11 @@
 from openerp.osv import osv
 from openerp.tools.translate import _
-from os.path import join
-from os import path
-import csv, json, StringIO
+from os.path import join, isfile
+from os import path, listdir
+import csv, StringIO
 import logging
+from shutil import move
+
 
 class product(osv.Model):
 
@@ -94,38 +96,47 @@ class product(osv.Model):
         went into error.
         ---------------------------------------------------- '''
 
-        # Find the file
-        # -------------
+        # Find the files to process
+        # -------------------------
         root_path = join('EDI', cr.dbname, 'THR_product_upload')
         self.log.info('UPLOAD_THR: attempting to open folder {!s}'.format(root_path))
         if not path.exists(root_path):
             self.log.error('UPLOAD_THR: could not open folder {!s}'.format(root_path))
             return False
-        root_path = join(root_path, 'export_pim_handig.csv')
-
-        # Read the file and send it for processing
-        # ----------------------------------------
-        content = self.read_thr_file(cr, uid, root_path)
-        if not self.validate_thr_file(cr, uid, content):
-            self.log.info('UPLOAD_THR: The file contained structural errors, aborting process.')
-            return False
 
 
-        self.upload_thr_master(cr, uid, param, content, context)
+        files = [ f for f in listdir(root_path) if isfile(join(root_path, f)) and f[0] != '.' ]
+        for f in files:
 
-        # If errors occurred, they will be stored in attribute self.result
-        # see thr_products.py
-        # ----------------------------------------------------------------
-        if self.invalid:
-            self.log.info('UPLOAD_THR: Errors occurred during masterdata upload, performing cleanup.')
-            self.invalid.insert(0, self.header) #add the header line to this list
-            flow_id = self.read_thr_master_flow_id(cr, uid)
-            edi_db = self.pool.get('clubit.tools.edi.document')
-            self.log.info('UPLOAD_THR: Creating EDI document to hold erroneous lines.')
-            edi_db.position_document(cr, uid, self.thr, flow_id, self.invalid, content_type='csv')
-            self.log.info('UPLOAD_THR: Cleanup done.')
+            # Read the file and send it for processing
+            # ----------------------------------------
+            content = self.read_thr_file(cr, uid, join(root_path, f))
+            if not self.validate_thr_file(cr, uid, content):
+                self.log.info('UPLOAD_THR: The file contained structural errors, aborting process.')
+                return False
 
-        cr.commit()
+
+            self.upload_thr_master(cr, uid, param, content, context)
+
+            # If errors occurred, they will be stored in attribute self.result
+            # see thr_products.py
+            # ----------------------------------------------------------------
+            if self.invalid:
+                self.log.info('UPLOAD_THR: Errors occurred during masterdata upload, performing cleanup.')
+                self.invalid.insert(0, self.header) #add the header line to this list
+                flow_id = self.read_thr_master_flow_id(cr, uid)
+                edi_db = self.pool.get('clubit.tools.edi.document')
+                self.log.info('UPLOAD_THR: Creating EDI document to hold erroneous lines.')
+                edi_db.position_document(cr, uid, self.thr, flow_id, self.invalid, content_type='csv')
+                self.log.info('UPLOAD_THR: Cleanup done.')
+
+            try:
+                move(join(root_path, f), join(root_path, 'processed', f))
+            except Exception as e:
+                self.log.warning('UPLOAD_THR: Could not move file to the processed folder, error given: {!s}'.format(str(e)))
+
+
+            cr.commit()
         return True
 
 
