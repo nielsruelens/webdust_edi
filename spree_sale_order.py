@@ -36,6 +36,15 @@ class sale_order(osv.Model):
             edi_db.message_post(cr, uid, document.id, body='Error found: content is not valid JSON.')
             return self.resolve_helpdesk_case(cr, uid, document)
 
+
+        if 'number' not in data:
+            edi_db.message_post(cr, uid, document.id, body='Error found: No number provided.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+        if self.search(cr, uid, [('name', '=', data['number'])]):
+            edi_db.message_post(cr, uid, document.id, body='Error found: number has already been imported.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+
+
         # Check if the minimum amount of customer information is provided
         # ---------------------------------------------------------------
         if 'email' not in data:
