@@ -17,6 +17,7 @@ class webdust_edi_post_install(osv.TransientModel):
     def finalize_installation(self, cr, context=None):
 
         partner_db = self.pool.get('res.partner')
+        model_db = self.pool.get('ir.model.data')
 
         # Make sure the THR EDI folders exist
         # -----------------------------------
@@ -33,7 +34,11 @@ class webdust_edi_post_install(osv.TransientModel):
             if not partner.edi_flows:
                 flow = self.get_flow_id(cr, 1, 'edi_spree_sale_order_in')
                 if flow: partner_db.write(cr, 1, [partner.id], {'edi_relevant':True, 'edi_flows': [[0,False,{'flow_id' : flow, 'partnerflow_active':True}]]})
-                #{'edi_relevant': True, 'edi_flows': [[0, False, {'partnerflow_active': True, 'flow_id': 11}]]}
+
+            # Give the handig.nl partner the correct external identifier
+            external = model_db.search(cr, 1, [('name','=','webdust_handig_nl')])
+            if not external:
+                model_db.create(cr, 1, {'module': 'webdust_edi_manual', 'name':'webdust_handig.nl', 'model':'res.partner', 'res_id':partner.id})
 
 
         # Configure the THR partner for all EDI flows
@@ -59,5 +64,11 @@ class webdust_edi_post_install(osv.TransientModel):
                 if flow: vals['edi_flows'].append([0,False,{'flow_id' : flow, 'partnerflow_active':True}])
 
                 partner_db.write(cr, 1, [partner.id], vals)
+
+            # Give the handig.nl partner the correct external identifier
+            external = model_db.search(cr, 1, [('name','=','webdust_thr')])
+            if not external:
+                model_db.create(cr, 1, {'module': 'webdust_edi_manual', 'name':'webdust_thr', 'model':'res.partner', 'res_id':partner.id})
+
 
         return True
