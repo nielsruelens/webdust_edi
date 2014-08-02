@@ -75,7 +75,6 @@ class product(osv.Model):
                 self.log.warning(warning)
                 self.warnings.append(warning)
                 line[2] = '0' * (13-len(line[2])) + line[2]
-                #content[i+1] = line
 
 
         # Split the actual processing of the content into

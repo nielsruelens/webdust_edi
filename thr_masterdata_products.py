@@ -124,8 +124,8 @@ class product(osv.Model):
                 warning = 'UPLOAD_THR-PRODUCTS: adding missing leading zeroes to EAN {!s}'.format(line[self.indexes['ean13']])
                 self.log.warning(warning)
                 self.warnings.append(warning)
-                line[1] = '0' * (13-len(line[self.indexes['ean13']])) + line[self.indexes['ean13']]
-                content[i+1] = line
+                line[self.indexes['ean13']] = '0' * (13-len(line[self.indexes['ean13']])) + line[self.indexes['ean13']]
+                #content[i+1] = line
 
 
 

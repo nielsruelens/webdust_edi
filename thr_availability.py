@@ -63,6 +63,18 @@ class product(osv.Model):
         if not content or not supplier:
             return False
 
+        # Fix all EAN codes, might be a couple missing leading zeroes
+        # Reason this is done beforehand is because we want to be
+        # able to search for all existing products in 1 go, see below.
+        # ------------------------------------------------------------
+        self.log.info('UPLOAD-AVAILABILITY: checking if all the EAN codes are 13 chars long.')
+        for i, line in enumerate(content):
+            if len(line[1]) < 13:
+                warning = 'UPLOAD-AVAILABILITY: adding missing leading zeroes to EAN {!s}'.format(line[1])
+                self.log.warning(warning)
+                self.warnings.append(warning)
+                line[1] = '0' * (13-len(line[1])) + line[1]
+
         # Split the actual processing of the content into
         # several threads to hopefully speed up performance
         # -------------------------------------------------
