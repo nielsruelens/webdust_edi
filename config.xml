@@ -19,6 +19,12 @@
 			<field name="model">product.product</field>
 			<field name="method">edi_import_availability</field>
 		</record>
+		<record id="edi_thr_product_location_in" model="clubit.tools.edi.flow">
+			<field name="name">Location(in)</field>
+			<field name="direction">in</field>
+			<field name="model">product.product</field>
+			<field name="method">edi_import_locations</field>
+		</record>
 		<record id="edi_thr_purchase_order_out" model="clubit.tools.edi.flow">
 			<field name="name">Purchase Order(out)</field>
 			<field name="direction">out</field>

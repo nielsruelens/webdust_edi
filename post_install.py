@@ -38,7 +38,7 @@ class webdust_edi_post_install(osv.TransientModel):
             # Give the handig.nl partner the correct external identifier
             external = model_db.search(cr, 1, [('name','=','webdust_handig_nl')])
             if not external:
-                model_db.create(cr, 1, {'module': 'webdust_edi_manual', 'name':'webdust_handig.nl', 'model':'res.partner', 'res_id':partner.id})
+                model_db.create(cr, 1, {'module': 'webdust_edi_manual', 'name':'webdust_handig_nl', 'model':'res.partner', 'res_id':partner.id})
 
 
         # Configure the THR partner for all EDI flows
@@ -55,6 +55,9 @@ class webdust_edi_post_install(osv.TransientModel):
                 if flow: vals['edi_flows'].append([0,False,{'flow_id' : flow, 'partnerflow_active':True}])
 
                 flow = self.get_flow_id(cr, 1, 'edi_thr_product_availability_in')
+                if flow: vals['edi_flows'].append([0,False,{'flow_id' : flow, 'partnerflow_active':True}])
+
+                flow = self.get_flow_id(cr, 1, 'edi_thr_product_location_in')
                 if flow: vals['edi_flows'].append([0,False,{'flow_id' : flow, 'partnerflow_active':True}])
 
                 flow = self.get_flow_id(cr, 1, 'edi_thr_purchase_order_out')

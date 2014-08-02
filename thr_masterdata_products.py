@@ -9,7 +9,7 @@ class product(osv.Model):
 
     _name = "product.product"
     _inherit = 'product.product'
-    _description = "Product extensions"
+    _description = "Product location extensions"
 
     log = logging.getLogger(None)
 

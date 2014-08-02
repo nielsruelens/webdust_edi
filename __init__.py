@@ -7,6 +7,7 @@ import thr_masterdata
 import thr_masterdata_categories
 import thr_masterdata_properties
 import thr_masterdata_products
+import thr_locations
 import thr_pricing
 import thr_availability
 import settings

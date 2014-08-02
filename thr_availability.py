@@ -23,7 +23,7 @@ class product(osv.Model):
         edi_db = self.pool.get('clubit.tools.edi.document.incoming')
         self.settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
         if not self.settings:
-            edi_db.message_post(cr, uid, ids, body='Could not start the pricing upload, missing EDI settings.')
+            edi_db.message_post(cr, uid, ids, body='Could not start the availability upload, missing EDI settings.')
             return False
 
         # Process the EDI Document
@@ -40,7 +40,7 @@ class product(osv.Model):
         del content[0] #throw out the header, don't need it
 
         result = self.upload_availability(cr, uid, document.partner_id, content, context)
-        self.log.info('UPLOAD-AVAILABILITY: Pricing upload is complete for supplier {!s}.'.format(document.partner_id.name))
+        self.log.info('UPLOAD-AVAILABILITY: Availability upload is complete for supplier {!s}.'.format(document.partner_id.name))
 
         if result:
             edi_db.message_post(cr, uid, ids, body='<br/>'.join(list(chain(*result))))
