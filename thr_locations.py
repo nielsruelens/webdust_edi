@@ -70,11 +70,11 @@ class product(osv.Model):
         # ------------------------------------------------------------
         self.log.info('UPLOAD-LOCATIONS: checking if all the EAN codes are 13 chars long.')
         for i, line in enumerate(content):
-            if len(line[2]) < 13:
-                warning = 'UPLOAD-LOCATIONS: adding missing leading zeroes to EAN {!s}'.format(line[2])
+            if len(line[0]) < 13:
+                warning = 'UPLOAD-LOCATIONS: adding missing leading zeroes to EAN {!s}'.format(line[0])
                 self.log.warning(warning)
                 self.warnings.append(warning)
-                line[2] = '0' * (13-len(line[2])) + line[2]
+                line[0] = '0' * (13-len(line[0])) + line[0]
 
 
         # Split the actual processing of the content into
@@ -120,7 +120,7 @@ class product(osv.Model):
             # Get all the ids + content for all the products that already exist.
             # ------------------------------------------------------------------
             self.log.info('UPLOAD-LOCATIONS: reading products.')
-            prod_ids = self.search(new_cr, uid, [('ean13', 'in', [ x[2] for x in content ])])
+            prod_ids = self.search(new_cr, uid, [('ean13', 'in', [ x[0] for x in content ])])
             products = self.read(new_cr, uid, prod_ids, ['id', 'ean13'], context=context)
 
 
@@ -132,10 +132,10 @@ class product(osv.Model):
 
                 # Make sure the product actually exists in OpenERP
                 # ------------------------------------------------
-                self.log.info('UPLOAD-LOCATIONS: processing product with EAN {!s} ({!s} of {!s})'.format(line[2], i, len(content)))
-                product = next((x for x in products if x['ean13'] == line[2]), None)
+                self.log.info('UPLOAD-LOCATIONS: processing product with EAN {!s} ({!s} of {!s})'.format(line[0], i, len(content)))
+                product = next((x for x in products if x['ean13'] == line[0]), None)
                 if not product:
-                    string = 'UPLOAD-LOCATIONS: location provided for ean {!s} but the product is not defined in OpenERP.'.format(line[2])
+                    string = 'UPLOAD-LOCATIONS: location provided for ean {!s} but the product is not defined in OpenERP.'.format(line[0])
                     self.log.warning(string)
                     results[index].append(string)
                     continue
@@ -149,7 +149,7 @@ class product(osv.Model):
 
                 # Add the location data
                 # ---------------------
-                self.write(new_cr, uid, [product['id']], {'supplier_storage_location':line[4]}, context=None)
+                self.write(new_cr, uid, [product['id']], {'supplier_storage_location':line[1]}, context=None)
 
             new_cr.commit()
         finally:
