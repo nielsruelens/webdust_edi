@@ -11,6 +11,8 @@ class spree_product_manager(osv.Model):
     _inherit = "product.product"
 
     def write(self, cr, uid, ids, vals, context=None):
+
+        product_hashes = self.read(cr, uid, ids, ['id', 'change_hash'], context=context)
         result = super(spree_product_manager, self).write(cr, uid,ids, vals, context)
 
         # Read customizing
@@ -25,10 +27,16 @@ class spree_product_manager(osv.Model):
 
         # Collect and push
         # ----------------
-        products = self.read(cr, uid, ids, ['id', 'name', 'description', 'ean13', 'list_price', 'cost_price', 'sale_ok'], context=context)
+        products = self.read(cr, uid, ids, ['id', 'name', 'description', 'ean13', 'list_price', 'cost_price', 'sale_ok', 'change_hash'], context=context)
 
         calls = []
         for product in products:
+
+            # Only products whose hash has changed are pushed
+            # -----------------------------------------------
+            if product['change_hash'] == [x['change_hash'] for x in product_hashes if x['id'] == product['id']][0]:
+                continue
+
             url = '{!s}/{!s}/{!s}'.format(connection.url, str(product['id']), 'push')
             header = {'content-type': 'application/json', connection.user: connection.password}
 

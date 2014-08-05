@@ -4,7 +4,6 @@
 		<!-- Automatic PO Quotation pusher -->
 		<record model="ir.cron" id="webdust_edi_quotation_pusher">
 			<field name="name">MRP/EDI Quotation pusher</field>
-			<field name="active" eval="False" />
 			<field name="interval_number">1</field>
 			<field name="interval_type">minutes</field>
 			<field name="numbercall">-1</field>
@@ -18,7 +17,6 @@
 		<!-- THR FTP masterdata downloader -->
 		<record model="ir.cron" id="webdust_thr_ftp_downloader">
 			<field name="name">EDI/FTP masterdata downloader</field>
-			<field name="active" eval="False" />
 			<field name="interval_number">1</field>
 			<field name="interval_type">days</field>
 			<field name="numbercall">-1</field>
@@ -32,7 +30,6 @@
 		<!-- THR FTP masterdata/availability combined handler -->
 		<record model="ir.cron" id="webdust_thr_masterdata_combined">
 			<field name="name">EDI/THR masterdata combined upload</field>
-			<field name="active" eval="False" />
 			<field name="interval_number">1</field>
 			<field name="interval_type">days</field>
 			<field name="numbercall">-1</field>
