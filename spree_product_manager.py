@@ -27,7 +27,10 @@ class spree_product_manager(osv.Model):
 
         # Collect and push
         # ----------------
-        products = self.read(cr, uid, ids, ['id', 'name', 'description', 'ean13', 'list_price', 'cost_price', 'sale_ok', 'change_hash'], context=context)
+
+        products = self.read(cr, uid, ids, ['id', 'name', 'description', 'ean13', 'list_price', 'cost_price', 'sale_ok', 'change_hash', 'properties', 'images'], context=context)
+        properties = self.pool.get('webdust.product.property').browse(cr, uid, [item for sublist in [x['properties'] for x in products] for item in sublist])
+        images = self.pool.get('webdust.image').browse(cr, uid, [item for sublist in [x['images'] for x in products] for item in sublist])
 
         calls = []
         for product in products:
@@ -52,7 +55,13 @@ class spree_product_manager(osv.Model):
                 'price'       : price or product['cost_price']*1.45,
                 'cost_price'  : product['cost_price'],
                 'shipping_category_id' : 1,
+                'properties'  : [],
+                'images'      : [],
             }, 'interface_name': 'handig'}
+
+            param['images'] = [x.url for x in images if x.id in [y for y in product['images']]]
+            param['properties'] = [(x.name.name, x.value) for x in properties if x.id in [y for y in product['properties']] and x.name.visibility == 'external']
+
             if product['sale_ok']:
                 param['product']['available_on'] = datetime.datetime.today().strftime('%Y/%m/%d')
             else:
