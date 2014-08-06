@@ -22,7 +22,7 @@
 			<field name="numbercall">-1</field>
 			<field name="doall" eval="False" />
 			<field name="nextcall" eval="' '.join([time.strftime('%Y-%m-%d'), '08:15'])" /> <!-- daily at 08:15 -->
-			<field name="model">product.product</field>
+			<field name="model">webdust.thr.ftp.download</field>
 			<field name="function">thr_ftp_download</field>
 			<field name="args">()</field>
 		</record>
