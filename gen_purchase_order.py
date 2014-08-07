@@ -1,8 +1,12 @@
 from openerp.osv import osv,fields
 from openerp.tools.translate import _
+from openerp import netsvc
 from itertools import groupby
 import logging
-import json, requests, datetime, time
+import json
+import requests
+import datetime
+import time
 
 #       +-------------------------+     +-------------------+
 #       |  push_quotations_manual |     |  push_quotations  |
@@ -441,79 +445,108 @@ class purchase_order(osv.Model):
 
         # Check if the supplierReference is provided and exists
         # -----------------------------------------------------
-        if 'supplierReference' not in data:
+        reference = data.get('supplierReference', False)
+        if not reference:
+            reference = data['order'].get('supplierReference', False)
+        if not reference:
             edi_db.message_post(cr, uid, document.id, body='Error found: supplierReference is not provided.')
             return self.resolve_helpdesk_case(cr, uid, document)
 
-        order_id = self.search(cr, uid, [('name','=', data['supplierReference'])])
+        order_id = self.search(cr, uid, [('partner_ref','=', reference)])
         if not order_id:
-            edi_db.message_post(cr, uid, document.id, body='Error found: supplierReference {!s} is unknown.'.format(data['supplierReference']))
+            edi_db.message_post(cr, uid, document.id, body='Error found: supplierReference {!s} is unknown.'.format(reference))
             return self.resolve_helpdesk_case(cr, uid, document)
         order = self.browse(cr, uid, order_id[0])
 
-        # Since THR doesn't give us all the data, we need to enrich this EDI document by pulling the latest version
-        # ---------------------------------------------------------------------------------------------------------
-        settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
-        rest_info = [x for x in settings.connections if x.name == 'THR_REST_PO']
-        if not rest_info:
-            edi_db.message_post(cr, uid, document.id, body='Error found: THR_REST_PO service is missing in our customizing!')
-            return self.resolve_helpdesk_case(cr, uid, document)
-        rest_info = rest_info[0]
+        # Since THR doesn't give us all the data, we need to check if this document needs to be enriched
+        # ----------------------------------------------------------------------------------------------
+        if not data.get('order', False):
 
-        # Actually perform the pull
-        # -------------------------
-        result = self.pull(cr, uid, order, rest_info)
-        if result == False:
-            edi_db.message_post(cr, uid, document.id, body='Error occurred: could not pull the latest data from THR.')
-            return self.resolve_helpdesk_case(cr, uid, document)
-        else:
-            try:
-                data = json.loads(result)
-                if not data:
-                    edi_db.message_post(cr, uid, document.id, body='Error found: EDI Document is empty.')
-                    return self.resolve_helpdesk_case(cr, uid, document)
-            except Exception:
-                edi_db.message_post(cr, uid, document.id, body='Error found: content is not valid JSON.')
+            settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
+            rest_info = [x for x in settings.connections if x.name == 'THR_REST_PO']
+            if not rest_info:
+                edi_db.message_post(cr, uid, document.id, body='Error found: THR_REST_PO service is missing in our customizing!')
                 return self.resolve_helpdesk_case(cr, uid, document)
-        edi_db.write(cr, uid, document.id, {'content' : result})
+            rest_info = rest_info[0]
+
+            # Actually perform the enrichment pull
+            # ------------------------------------
+            result = self.pull(cr, uid, order, rest_info)
+            if result == False:
+                edi_db.message_post(cr, uid, document.id, body='Error occurred: could not pull the latest data from THR.')
+                return self.resolve_helpdesk_case(cr, uid, document)
+            else:
+                try:
+                    data = json.loads(result)
+                    if not data:
+                        edi_db.message_post(cr, uid, document.id, body='Error found: EDI Document pulled from THR is empty.')
+                        return self.resolve_helpdesk_case(cr, uid, document)
+                except Exception:
+                    edi_db.message_post(cr, uid, document.id, body='Error found: content pulled from THR is not valid JSON.')
+                    return self.resolve_helpdesk_case(cr, uid, document)
+            edi_db.write(cr, uid, document.id, {'content' : result})
 
 
 
 
         # Validate the document now that it contains the most recent data
         # ---------------------------------------------------------------
-        if 'line_items' not in data:
-            edi_db.message_post(cr, uid, document.id, body='Error found: No line items provided in this document.')
+        if not data.get('orderId', False):
+            edi_db.message_post(cr, uid, document.id, body='Error found: orderId (at root level) missing in this document.')
             return self.resolve_helpdesk_case(cr, uid, document)
-        if len(data['line_items']) == 0:
-            edi_db.message_post(cr, uid, document.id, body='Error found: No line items provided in this document.')
+        if not data.get('status', False):
+            edi_db.message_post(cr, uid, document.id, body='Error found: status (at root level) missing in this document.')
             return self.resolve_helpdesk_case(cr, uid, document)
 
-        for line in data['line_items']:
-            if 'price' not in line:
-                edi_db.message_post(cr, uid, document.id, body='Error found: line item with id {!s} did not have a price.'.format(line['id']))
+
+        details = data.get('order', False)
+        if not details:
+            edi_db.message_post(cr, uid, document.id, body='Error found: No order details provided in this document.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+
+        if not details.get('amountTotal', False):
+            edi_db.message_post(cr, uid, document.id, body='Error found: amountTotal missing in this document.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+        if not details.get('orderID', False):
+            edi_db.message_post(cr, uid, document.id, body='Error found: orderID missing in this document.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+        if not details.get('supplierReference', False):
+            edi_db.message_post(cr, uid, document.id, body='Error found: supplierReference missing in this document.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+
+        if not details.get('shippingAddress', False):
+            edi_db.message_post(cr, uid, document.id, body='Error found: shippingAddress missing in this document.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+        if len(details['shippingAddress']) != 2:
+            edi_db.message_post(cr, uid, document.id, body='Error found: shippingAddress should contain exactly 2 elements.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+
+        if not details.get('orderPositions', False):
+            edi_db.message_post(cr, uid, document.id, body='Error found: orderPositions missing in this document.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+        if len(details['orderPositions']) == 0:
+            edi_db.message_post(cr, uid, document.id, body='Error found: orderPositions missing in this document.')
+            return self.resolve_helpdesk_case(cr, uid, document)
+
+
+        for i, line in enumerate(details['orderPositions']):
+            if not line.get('articleNumber', False):
+                edi_db.message_post(cr, uid, document.id, body='Error found: line item at index {!s} did not have an articleNumber.'.format(str(i)))
                 return self.resolve_helpdesk_case(cr, uid, document)
-            if line['price'] == 0:
-                edi_db.message_post(cr, uid, document.id, body='Error found: line item with id {!s} did not have a price.'.format(line['id']))
+            if not line.get('articlePrice', False):
+                edi_db.message_post(cr, uid, document.id, body='Error found: line item at index {!s} did not have an articlePrice.'.format(str(i)))
+                return self.resolve_helpdesk_case(cr, uid, document)
+            if not line.get('quantity', False):
+                edi_db.message_post(cr, uid, document.id, body='Error found: line item at index {!s} did not have an quantity.'.format(str(i)))
                 return self.resolve_helpdesk_case(cr, uid, document)
 
-            if 'variant' not in line:
-                edi_db.message_post(cr, uid, document.id, body='Error found: line item with id {!s} did not structure "variant".'.format(line['id']))
-                return self.resolve_helpdesk_case(cr, uid, document)
-            if 'sku' not in line['variant']:
-                edi_db.message_post(cr, uid, document.id, body='Error found: line item with id {!s} did not have field "variant:sku (ean code)".'.format(line['id']))
-                return self.resolve_helpdesk_case(cr, uid, document)
-            if not line['variant']['sku']:
-                edi_db.message_post(cr, uid, document.id, body='Error found: line item with id {!s} did have an ean code.'.format(line['id']))
-                return self.resolve_helpdesk_case(cr, uid, document)
-
-            product = product_db.search(cr, uid, [('ean13', '=', line['variant']['sku'])])
+            product = product_db.search(cr, uid, [('ean13', '=', line['articleNumber'])])
             if not product:
-                edi_db.message_post(cr, uid, document.id, body='Error found: line item with id {!s} had an unknown ean code.'.format(line['id']))
+                edi_db.message_post(cr, uid, document.id, body='Error found: line item at index {!s} had an unknown articleNumber (ean).'.format(str(i)))
                 return self.resolve_helpdesk_case(cr, uid, document)
-            product = product_db.browse(cr, uid, product[0])
-            if not product.sale_ok:
-                edi_db.message_post(cr, uid, document.id, body='Error found: line item with id {!s} had an article that cannot be sold.'.format(line['id']))
+
+            if not [x for x in order.order_line if x.product_id.ean13 == line['articleNumber']]:
+                edi_db.message_post(cr, uid, document.id, body='Error found: line item at index {!s} had an articleNumber (ean) that was not part of the quotation!'.format(str(i)))
                 return self.resolve_helpdesk_case(cr, uid, document)
 
 
@@ -523,9 +556,9 @@ class purchase_order(osv.Model):
 
 
 
-    def edi_import_spree(self, cr, uid, ids, context):
-        ''' purchase.order:edi_import_spree()
-        -------------------------------------
+    def edi_import_thr(self, cr, uid, ids, context):
+        ''' purchase.order:edi_import_thr()
+        -----------------------------------
         This method will perform the actual import of the
         provided EDI Document.
         ------------------------------------------------- '''
@@ -541,91 +574,64 @@ class purchase_order(osv.Model):
         # Process the EDI Document
         # ------------------------
         document = edi_db.browse(cr, uid, ids, context)
-        name = self.process_edi_document(cr, uid, document, context)
+        name = self.process_incoming_thr_document(cr, uid, document, context)
         if not name:
-            edi_db.message_post(cr, uid, ids, body='Error found: something went wrong while creating the sale order.')
+            edi_db.message_post(cr, uid, ids, body='Error found: something went wrong while updating the quotation.')
             return False
         else:
-            edi_db.message_post(cr, uid, ids, body='Sale order {!s} created'.format(name))
+            edi_db.message_post(cr, uid, ids, body='Quotation {!s} converted to a Purchase Order.'.format(name))
             return True
 
 
 
-    def process_edi_document(self, cr, uid, document, context):
-        ''' purchase.order:create_sale_order_spree()
-        --------------------------------------------
-        This method will create a sales order based
-        on the provided EDI input.
-        ------------------------------------------- '''
+    def process_incoming_thr_document(self, cr, uid, document, context):
+        ''' purchase.order:process_incoming_thr_document()
+        --------------------------------------------------
+        This method will adjust and validate the quotation
+        regardless of what THR said they can deliver.
+        -------------------------------------------------- '''
 
-        product_db = self.pool.get('product.product')
-        ir_model_db = self.pool.get('ir.model.data')
-        edi_db = self.pool.get('clubit.tools.edi.document.incoming')
+        try:
+            data = json.loads(document.content)
+        except Exception:
+            return False
 
-        # Check if the customer already exists, create it if it doesn't
-        # -------------------------------------------------------------
-        data = json.loads(document.content)
-        customer, message = self.resolve_customer(cr, uid, document.partner_id, data['bill_address'], data['email'])
-        if not customer:
-            edi_db.message_post(cr, uid, document.id, body='Error during processing: {!s}'.format(message))
-            return self.resolve_helpdesk_case(cr, uid, document)
+        order = self.search(cr, uid, [('partner_ref', '=', data['order']['supplierReference'])])
+        if not order: return False
+        order = self.browse(cr, uid, order[0])
 
-        payment = False
-        if data['payment_state'] == 'balance_due':
-            payment = ir_model_db.search(cr, uid, [('name','=', 'edi_payment_term2'), ('model', '=', 'account.payment.term')])
-        elif data['payment_state'] == 'pending':
-            payment = ir_model_db.search(cr, uid, [('name','=', 'edi_payment_term1'), ('model', '=', 'account.payment.term')])
-        if payment:
-            payment = ir_model_db.browse(cr, uid, payment[0]).res_id
+        # Confirm the purchase order, regardless of what THR says
+        # -------------------------------------------------------
+        wf_service = netsvc.LocalService('workflow')
+        wf_service.trg_validate(uid, 'purchase.order', order.id, 'purchase_confirm', cr)
 
 
-        # Prepare the call to create a sale order
-        # ---------------------------------------
-        vals = {
-            'partner_id'          : customer.id,
-            'partner_shipping_id' : customer.id,
-            'partner_invoice_id'  : customer.id,
-            'pricelist_id'        : customer.property_product_pricelist.id,
-            'origin'              : data['number'],
-            'date_order'          : data['created_at'][0:10],
-            'payment_term'        : payment,
-            'order_line'          : [],
-            'picking_policy'      : 'one',
-            'order_policy'        : 'picking'
-        }
+        # The confirmation of the PO should have lead to the creation of an incoming shipment
+        # We're now going to receive this incoming shipment according to what THR provided us.
+        # In case of shortages, this should automatically create a backorder for easier tracking.
+        # ---------------------------------------------------------------------------------------
+        shipment_db = self.pool.get('stock.picking.in')
+        shipment = shipment_db.search(cr, uid, [('purchase_id', '=', order.id)])
+        if not shipment:
+            return False
 
+        vals = {}
+        for order_line in order.order_line:
+            line = [x for x in data['order']['orderPositions'] if x['articleNumber'] == order_line.product_id.ean13]
+            move = {'prodlot_id': False, 'product_id': order_line.product_id.id, 'product_uom': order_line.product_uom.id}
+            if line:
+                move['product_qty'] = line['quantity']
+                vals["move" + str(line.id)] = move
 
-        for line in data['line_items']:
-
-            product = product_db.search(cr, uid, [('ean13', '=', line['variant']['sku'])])
-            product = product_db.browse(cr, uid, product[0])
-
-            detail = {
-                'product_uos_qty' : line['quantity'],
-                'product_uom_qty' : line['quantity'],
-                'product_id'      : product.id,
-                'type'            : product.procure_method,
-                'price_unit'      : line['price'],
-                'name'            : line['variant']['name'],
-                'th_weight'       : product.weight * line['quantity'],
-                'tax_id'          : [[6, False, self.pool.get('account.fiscal.position').map_tax(cr, uid, customer.property_account_position, product.taxes_id)   ]],
-            }
-
-            order_line = []
-            order_line.extend([0])
-            order_line.extend([False])
-            order_line.append(detail)
-            vals['order_line'].append(order_line)
-
+        # Make the call to do_partial() to set the document to 'done'
+        # -----------------------------------------------------------
+        try:
+            shipment_db.do_partial(cr, uid, [shipment.id], vals, context)
+        except Exception:
+            return False
 
         # Actually create the sale order
         # ------------------------------
-        order = self.create(cr, uid, vals, context=None)
-        if not order:
-            edi_db.message_post(cr, uid, document.id, body='Error during processing: could not create the sale order, unknown reason.')
-            return self.resolve_helpdesk_case(cr, uid, document)
-        self.action_button_confirm(cr, uid, [order])
-        order = self.browse(cr, uid, order)
         return order.name
 
 
