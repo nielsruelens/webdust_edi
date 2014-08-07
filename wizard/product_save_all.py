@@ -14,7 +14,7 @@ class webdust_product_save_all(osv.TransientModel):
         new_cr = pooler.get_db(cr.dbname).cursor()
 
         context['save_anyway'] = True
-        products = prod_db.search(new_cr, uid, [], limit=10, context=context)
+        products = prod_db.search(new_cr, uid, [], context=context)
         for i in xrange(0, len(products), 1000):
             log.info('MASS-PRODUCT-SAVE: saving products {!s} to {!s} of {!s}.'.format(i,i+1000, len(products)))
             prod_db.write(new_cr, uid, products[i:i+1000], {}, context=context)
