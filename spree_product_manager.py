@@ -60,7 +60,7 @@ class spree_product_manager(osv.Model):
             }, 'interface_name': 'handig'}
 
             param['images'] = [x.url for x in images if x.id in [y for y in product['images']]]
-            param['properties'] = [(x.name.name, x.value) for x in properties if x.id in [y for y in product['properties']] and x.name.visibility == 'external']
+            param['properties'] = [{'name':x.name.name, 'value':x.value} for x in properties if x.id in [y for y in product['properties']] and x.name.visibility == 'external']
 
             if product['sale_ok']:
                 param['product']['available_on'] = datetime.datetime.today().strftime('%Y/%m/%d')
