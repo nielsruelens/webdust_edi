@@ -55,7 +55,7 @@ class spree_product_manager(osv.Model):
                 'sku'         : product['ean13'],
                 'price'       : price or product['cost_price']*1.45,
                 'cost_price'  : product['cost_price'],
-                'recommended_price' : product['recommended_price'],
+                'recommended_retail_price' : product['recommended_price'],
                 'shipping_category_id' : 1,
                 'properties'  : [],
                 'images'      : [],
