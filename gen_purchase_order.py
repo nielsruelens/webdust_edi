@@ -284,7 +284,7 @@ class purchase_order(osv.Model):
         # Convert the quotation to JSON and push it
         # -----------------------------------------
         content = self.edi_export(cr, uid, order)
-        content['urlCallback'] = ''.join([http_connection.url, 'purchaseorder'])
+        content['urlCallback'] = ''.join([http_connection.url, 'purchaseorder?reference=',order.partner_ref])
         try:
             response = requests.put(connection.url, headers={'content-type': 'application/json'}, data=json.dumps(content), auth=(connection.user, connection.password))
             if response.status_code != 200:
