@@ -298,7 +298,7 @@ class product(osv.Model):
 
 
         vals['short_description'] = line[self.indexes['name']]
-        vals['description'] = line[self.indexes['long_description']]
+        vals['description'] = line[self.indexes['long_description']] or ''
         vals['procure_method'] = 'make_to_order'
         vals['type'] = 'product'
         vals['state'] = 'draft'
@@ -393,7 +393,7 @@ class product(osv.Model):
 
 
         vals['short_description'] = line[self.indexes['name']]
-        vals['description'] = line[self.indexes['long_description']]
+        vals['description'] = line[self.indexes['long_description']] or ''
         vals['recommended_price'] = line[self.indexes['recommended_price']]
         return {'id' : self.write(cr, uid, [product['id']], vals, context=None)}
 

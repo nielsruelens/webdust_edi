@@ -33,8 +33,27 @@ class purchase_order(osv.Model):
     _name = "purchase.order"
     _inherit = "purchase.order"
 
+
+    def _function_quotation_sent_get(self, cr, uid, ids, field, arg, context=None):
+        edi_db = self.pool.get('clubit.tools.edi.document.outgoing')
+        model_db = self.pool.get('ir.model.data')
+        flow_id = model_db.search(cr, uid, [('name', '=', 'edi_thr_purchase_order_out'), ('model','=','clubit.tools.edi.flow')])
+        if not flow_id: return False
+        flow_id = model_db.browse(cr, uid, flow_id)[0]
+        flow_id = flow_id.res_id
+
+        res = dict.fromkeys(ids, False)
+        for po in self.browse(cr, uid, ids, context=context):
+            docids = edi_db.search(cr, uid, [('flow_id', '=', flow_id),('reference', '=', po.partner_ref)])
+            if not docids: continue
+            edi_docs = edi_db.browse(cr, uid, docids, context=context)
+            edi_docs.sort(key = lambda x: x.create_date, reverse=True)
+            res[po.id] = edi_docs[0].create_date
+        return res
+
+
     _columns = {
-        'quotation_sent_at': fields.datetime('Quotation sent at', readonly=True),
+        'quotation_sent_at': fields.function(_function_quotation_sent_get, type='datetime', string='Quotation sent at'),
         'auto_edi_allowed': fields.boolean('Allow auto EDI sending'),
         'create_date':fields.datetime('Creation date'), #added so we can use it in the model
     }
@@ -116,9 +135,9 @@ class purchase_order(osv.Model):
     def copy(self, cr, uid, id, default=None, context=None):
         ''' purchase.order:copy_data
             ------------------------
-            The quotation_sent_at field cannot be copied during a duplication
-            ----------------------------------------------------------------- '''
-        default['quotation_sent_at'] = False
+            The partner reference and auto edi cannot be copied during a duplication
+            ------------------------------------------------------------------------ '''
+        default['partner_ref'] = False
         default['auto_edi_allowed'] = False
         return super(purchase_order, self).copy(cr, uid, id, default, context)
 
@@ -154,16 +173,19 @@ class purchase_order(osv.Model):
         proc_db.run_scheduler(cr, uid, False, True)
 
 
-        # Search for documents that need to be sent
-        # -----------------------------------------
+        # Search for documents that need to be sent, also throw out quotations
+        # that have already been sent before
+        # --------------------------------------------------------------------
         log.info('QUOTATION_PUSHER: Searching for quotations to send.')
-        pids = self.search(cr, uid, [('state', '=', 'draft'), ('quotation_sent_at', '=', False), ('auto_edi_allowed','=', True)])
+        pids = self.search(cr, uid, [('state', '=', 'draft'), ('auto_edi_allowed','=', True)])
         if not pids:
             log.info('QUOTATION_PUSHER: No quotations found. Processing is done.')
             return True
+        orders = self.browse(cr, uid, pids)
+        orders = [x for x in orders if not x.quotation_sent_at]
 
         log.info('QUOTATION_PUSHER: Sending the following POs: {!s}'.format(str(pids)))
-        orders = self.browse(cr, uid, pids)
+        return True
         return self.push_several(cr, uid, orders)
 
 
@@ -301,7 +323,6 @@ class purchase_order(osv.Model):
                     log.warning(error)
                 else:
                     log.info('QUOTATION_PUSHER: Quotation {!s} was sent successfully.'.format(order.name))
-                    self.write(cr, uid, order.id, {'quotation_sent_at': now})
                     self.create_outgoing_edi_document(cr, uid, content)
                     return True
 
@@ -316,7 +337,7 @@ class purchase_order(osv.Model):
         log.warning('QUOTATION_PUSHER: Quotation {!s} was not sent. Error given was: {!s}'.format(order.name, error))
         if created_at + datetime.timedelta(0,900)  < now:
             if not case:
-                helpdesk_db.create_simple_case(cr, uid, 'Quotation {!s} has been open for longer than an hour.'.format(order.name), self._PUSH_CODE, 'purchase.order,{!s}'.format(str(order.id)))
+                helpdesk_db.create_simple_case(cr, uid, 'Quotation {!s} has been open for longer than 15 minutes.'.format(order.name), self._PUSH_CODE, 'purchase.order,{!s}'.format(str(order.id)))
             else:
                 helpdesk_db.case_reset(cr, uid, [case.id])
         return True

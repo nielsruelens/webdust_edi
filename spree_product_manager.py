@@ -51,7 +51,7 @@ class spree_product_manager(osv.Model):
                                                                           { 'uom': 1, 'date': datetime.datetime.today().strftime('%Y-%m-%d'), })[connection.partner.property_product_pricelist.id]
             param = { 'product' : {
                 'name'        : product['name'],
-                'description' : product['description'],
+                'description' : product['description'] or '',
                 'sku'         : product['ean13'],
                 'price'       : price or product['cost_price']*1.45,
                 'cost_price'  : product['cost_price'],
@@ -71,7 +71,7 @@ class spree_product_manager(osv.Model):
                 param['product']['available_on'] = '2999/12/31'
 
             calls.append(grequests.put(url, data=json.dumps(param), headers=header))
-        grequests.map(calls, size=20)
+        grequests.map(calls, size=50)
         return result
 
 
