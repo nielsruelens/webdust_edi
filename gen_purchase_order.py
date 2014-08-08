@@ -183,9 +183,11 @@ class purchase_order(osv.Model):
             return True
         orders = self.browse(cr, uid, pids)
         orders = [x for x in orders if not x.quotation_sent_at]
+        if not pids:
+            log.info('QUOTATION_PUSHER: No quotations found. Processing is done.')
+            return True
 
         log.info('QUOTATION_PUSHER: Sending the following POs: {!s}'.format(str(pids)))
-        return True
         return self.push_several(cr, uid, orders)
 
 
