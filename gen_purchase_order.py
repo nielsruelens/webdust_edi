@@ -340,6 +340,7 @@ class purchase_order(osv.Model):
             if not case:
                 helpdesk_db.create_simple_case(cr, uid, 'Quotation {!s} has been open for longer than 15 minutes.'.format(order.name), error, 'purchase.order,{!s}'.format(str(order.id)))
             else:
+                case.write({'desciption': error})
                 helpdesk_db.case_reset(cr, uid, [case.id])
         return True
 
