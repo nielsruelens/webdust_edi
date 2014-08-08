@@ -445,9 +445,7 @@ class purchase_order(osv.Model):
 
         # Check if the supplierReference is provided and exists
         # -----------------------------------------------------
-        reference = data.get('supplierReference', False)
-        if not reference:
-            reference = data['order'].get('supplierReference', False)
+        reference = data['order'].get('supplierReference', False)
         if not reference:
             edi_db.message_post(cr, uid, document.id, body='Error found: supplierReference is not provided.')
             return self.resolve_helpdesk_case(cr, uid, document)
@@ -457,36 +455,6 @@ class purchase_order(osv.Model):
             edi_db.message_post(cr, uid, document.id, body='Error found: supplierReference {!s} is unknown.'.format(reference))
             return self.resolve_helpdesk_case(cr, uid, document)
         order = self.browse(cr, uid, order_id[0])
-
-        # Since THR doesn't give us all the data, we need to check if this document needs to be enriched
-        # ----------------------------------------------------------------------------------------------
-        if not data.get('order', False):
-
-            settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
-            rest_info = [x for x in settings.connections if x.name == 'THR_REST_PO' and x.is_active == True]
-            if not rest_info:
-                edi_db.message_post(cr, uid, document.id, body='Error found: THR_REST_PO service is missing in our customizing!')
-                return self.resolve_helpdesk_case(cr, uid, document)
-            rest_info = rest_info[0]
-
-            # Actually perform the enrichment pull
-            # ------------------------------------
-            result = self.pull(cr, uid, order, rest_info)
-            if result == False:
-                edi_db.message_post(cr, uid, document.id, body='Error occurred: could not pull the latest data from THR.')
-                return self.resolve_helpdesk_case(cr, uid, document)
-            else:
-                try:
-                    data = json.loads(result)
-                    if not data:
-                        edi_db.message_post(cr, uid, document.id, body='Error found: EDI Document pulled from THR is empty.')
-                        return self.resolve_helpdesk_case(cr, uid, document)
-                except Exception:
-                    edi_db.message_post(cr, uid, document.id, body='Error found: content pulled from THR is not valid JSON.')
-                    return self.resolve_helpdesk_case(cr, uid, document)
-            edi_db.write(cr, uid, document.id, {'content' : result})
-
-
 
 
         # Validate the document now that it contains the most recent data
@@ -604,6 +572,7 @@ class purchase_order(osv.Model):
         # -------------------------------------------------------
         wf_service = netsvc.LocalService('workflow')
         wf_service.trg_validate(uid, 'purchase.order', order.id, 'purchase_confirm', cr)
+        return order.name
 
 
         # The confirmation of the PO should have lead to the creation of an incoming shipment
