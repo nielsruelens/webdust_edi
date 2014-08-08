@@ -43,7 +43,7 @@ class webdust_thr_ftp_download(osv.TransientModel):
         flow_db = self.pool.get('clubit.tools.edi.flow')
         flow_id = flow_db.search(cr, uid, [('model', '=', 'product.product'),('method', '=', 'edi_import_availability')])[0]
         settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
-        ftp_info = [x for x in settings.connections if x.name == 'THR_FTP']
+        ftp_info = [x for x in settings.connections if x.name == 'THR_FTP' and x.is_active == True]
         if not ftp_info:
             log.warning('THR_FTP: Could not find the THR_FTP connection settings, creating CRM helpdesk case.')
             helpdesk_db.create_simple_case(cr, uid, header, 'Missing THR_FTP connection in the EDI settings')

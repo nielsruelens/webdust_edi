@@ -19,7 +19,7 @@ class spree_product_manager(osv.Model):
         # ----------------
         log = logging.getLogger(None)
         settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
-        connection = [x for x in settings.connections if x.name == 'SPREE_PRODUCT_MANAGER']
+        connection = [x for x in settings.connections if x.name == 'SPREE_PRODUCT_MANAGER' and x.is_active == True]
         if not connection:
             log.warning('SPREE_PRODUCT_PUSHER: Could not find the SPREE_PRODUCT_MANAGER connection settings, could not push product to Spree.')
             return result
@@ -61,8 +61,8 @@ class spree_product_manager(osv.Model):
                 'images'      : [],
             }, 'interface_name': 'handig'}
 
-            param['images'] = [x.url for x in images if x.id in [y for y in product['images']]]
-            param['properties'] = [{'name':x.name.name, 'value':x.value} for x in properties if x.id in [y for y in product['properties']] and x.name.visibility == 'external']
+            param['product']['images'] = [x.url for x in images if x.id in [y for y in product['images']]]
+            param['product']['properties'] = [{'name':x.name.name, 'value':x.value} for x in properties if x.id in [y for y in product['properties']] and x.name.visibility == 'external']
 
             if product['sale_ok']:
                 param['product']['available_on'] = datetime.datetime.today().strftime('%Y/%m/%d')

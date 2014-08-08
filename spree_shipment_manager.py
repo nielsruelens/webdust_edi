@@ -23,9 +23,9 @@ class spree_shipment_manager(osv.Model):
         # ----------------
         log = logging.getLogger(None)
         settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
-        connection = [x for x in settings.connections if x.name == 'SPREE_PRODUCT_MANAGER']
+        connection = [x for x in settings.connections if x.name == 'SPREE_SHIPMENT_MANAGER' and x.is_active == True]
         if not connection:
-            log.warning('SPREE_PRODUCT_MANAGER: Could not find the SPREE_PRODUCT_MANAGER connection settings, could not push shipment to Spree.')
+            log.warning('SPREE_SHIPMENT_MANAGER: Could not find the SPREE_SHIPMENT_MANAGER connection settings, could not push shipment to Spree.')
             return result
         connection = connection[0]
 

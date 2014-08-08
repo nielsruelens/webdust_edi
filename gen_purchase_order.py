@@ -210,7 +210,7 @@ class purchase_order(osv.Model):
         # Make sure the required customizing is present
         # ---------------------------------------------
         settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
-        rest_info = [x for x in settings.connections if x.name == 'THR_REST_PO']
+        rest_info = [x for x in settings.connections if x.name == 'THR_REST_PO' and x.is_active == True]
         if not rest_info:
             log.warning('QUOTATION_PUSHER: Could not find the THR_REST_PO connection settings, creating CRM helpdesk case.')
             helpdesk_db.create_simple_case(cr, uid, 'An error occurred during the MRP/EDI Quotation pusher.', 'Missing THR_REST_PO connection in the EDI settings')
@@ -218,7 +218,7 @@ class purchase_order(osv.Model):
             return True
         rest_info = rest_info[0]
 
-        http_info = [x for x in settings.connections if x.name == 'HTTP_EDI_SERVER']
+        http_info = [x for x in settings.connections if x.name == 'HTTP_EDI_SERVER' and x.is_active == True]
         if not http_info:
             log.warning('QUOTATION_PUSHER: Could not find the HTTP_EDI_SERVER connection settings, creating CRM helpdesk case.')
             helpdesk_db.create_simple_case(cr, uid, 'An error occurred during the MRP/EDI Quotation pusher.', 'Missing HTTP_EDI_SERVER connection in the EDI settings')
@@ -463,7 +463,7 @@ class purchase_order(osv.Model):
         if not data.get('order', False):
 
             settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
-            rest_info = [x for x in settings.connections if x.name == 'THR_REST_PO']
+            rest_info = [x for x in settings.connections if x.name == 'THR_REST_PO' and x.is_active == True]
             if not rest_info:
                 edi_db.message_post(cr, uid, document.id, body='Error found: THR_REST_PO service is missing in our customizing!')
                 return self.resolve_helpdesk_case(cr, uid, document)
