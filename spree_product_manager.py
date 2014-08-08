@@ -28,7 +28,7 @@ class spree_product_manager(osv.Model):
         # Collect and push
         # ----------------
 
-        products = self.read(cr, uid, ids, ['id', 'name', 'description', 'ean13', 'list_price', 'recommended_price', 'cost_price', 'sale_ok', 'change_hash', 'properties', 'images'], context=context)
+        products = self.read(cr, uid, ids, ['id', 'name', 'categ_id', 'description', 'ean13', 'list_price', 'recommended_price', 'cost_price', 'sale_ok', 'change_hash', 'properties', 'images'], context=context)
         properties = self.pool.get('webdust.product.property').browse(cr, uid, [item for sublist in [x['properties'] for x in products] for item in sublist])
         images = self.pool.get('webdust.image').browse(cr, uid, [item for sublist in [x['images'] for x in products] for item in sublist])
 
@@ -57,6 +57,7 @@ class spree_product_manager(osv.Model):
                 'cost_price'  : product['cost_price'],
                 'recommended_retail_price' : product['recommended_price'],
                 'shipping_category_id' : 1,
+                'categ_id'    : product['categ_id'][0],
                 'properties'  : [],
                 'images'      : [],
             }, 'interface_name': 'handig'}
