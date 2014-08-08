@@ -58,7 +58,6 @@ class purchase_order(osv.Model):
         'create_date':fields.datetime('Creation date'), #added so we can use it in the model
     }
 
-    _PUSH_CODE = 'PUSH_ERROR'
 
 # Dead code, but keeping it anyways
 # MRP logic is way more complex than this
@@ -273,7 +272,7 @@ class purchase_order(osv.Model):
             # ------------------------------------------------------
 
             case = False
-            hids = helpdesk_db.search(cr, uid, [('ref', '=', 'purchase.order,{!s}'.format(str(order.id))), ('description','=', self._PUSH_CODE)])
+            hids = helpdesk_db.search(cr, uid, [('ref', '=', 'purchase.order,{!s}'.format(str(order.id)))])
             if hids:
                 case = helpdesk_db.browse(cr, uid, hids[0])
                 if case.state != 'done':
@@ -308,7 +307,7 @@ class purchase_order(osv.Model):
         # Convert the quotation to JSON and push it
         # -----------------------------------------
         content = self.edi_export(cr, uid, order)
-        content['urlCallback'] = ''.join([http_connection.url, 'purchaseorder?reference=',order.partner_ref])
+        content['urlCallback'] = ''.join([http_connection.url, 'purchaseorder?reference=', order.partner_ref])
         try:
             response = requests.put(connection.url, headers={'content-type': 'application/json'}, data=json.dumps(content), auth=(connection.user, connection.password))
             if response.status_code != 200:
@@ -339,7 +338,7 @@ class purchase_order(osv.Model):
         log.warning('QUOTATION_PUSHER: Quotation {!s} was not sent. Error given was: {!s}'.format(order.name, error))
         if created_at + datetime.timedelta(0,900)  < now:
             if not case:
-                helpdesk_db.create_simple_case(cr, uid, 'Quotation {!s} has been open for longer than 15 minutes.'.format(order.name), self._PUSH_CODE, 'purchase.order,{!s}'.format(str(order.id)))
+                helpdesk_db.create_simple_case(cr, uid, 'Quotation {!s} has been open for longer than 15 minutes.'.format(order.name), error, 'purchase.order,{!s}'.format(str(order.id)))
             else:
                 helpdesk_db.case_reset(cr, uid, [case.id])
         return True
