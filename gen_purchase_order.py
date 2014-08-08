@@ -314,7 +314,7 @@ class purchase_order(osv.Model):
         # If the code reaches this point, it means something went wrong
         # -------------------------------------------------------------
         log.warning('QUOTATION_PUSHER: Quotation {!s} was not sent. Error given was: {!s}'.format(order.name, error))
-        if created_at + datetime.timedelta(0,3600)  < now:
+        if created_at + datetime.timedelta(0,900)  < now:
             if not case:
                 helpdesk_db.create_simple_case(cr, uid, 'Quotation {!s} has been open for longer than an hour.'.format(order.name), self._PUSH_CODE, 'purchase.order,{!s}'.format(str(order.id)))
             else:
