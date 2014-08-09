@@ -114,63 +114,63 @@ class product(osv.Model):
         # -----------------------------------
         new_cr = pooler.get_db(cr.dbname).cursor()
 
-        try:
+        #try:
 
-            # Get all the ids + content for all the products that already exist.
-            # ------------------------------------------------------------------
-            self.log.info('UPLOAD-AVAILABILITY: reading products.')
-            prod_ids = self.search(new_cr, uid, [('ean13', 'in', [ x[1] for x in content ])])
-            products = self.browse(new_cr, uid, prod_ids, context=context)
-
-
-            # Process all the products
-            # ------------------------
-            for i, line in enumerate(content):
-                i = i + 1
+        # Get all the ids + content for all the products that already exist.
+        # ------------------------------------------------------------------
+        self.log.info('UPLOAD-AVAILABILITY: reading products.')
+        prod_ids = self.search(new_cr, uid, [('ean13', 'in', [ x[1] for x in content ])])
+        products = self.browse(new_cr, uid, prod_ids, context=context)
 
 
-                # Make sure the product actually exists in OpenERP
-                # ------------------------------------------------
-                self.log.info('UPLOAD-AVAILABILITY: processing product with EAN {!s} ({!s} of {!s})'.format(line[1], i, len(content)))
-                product = next((x for x in products if x.ean13 == line[1]), None)
-                if not product:
-                    string = 'UPLOAD-AVAILABILITY: availability provided for ean {!s} but the product is not defined in OpenERP.'.format(line[1])
-                    self.log.warning(string)
-                    results[index].append(string)
-                    continue
-
-                # Make sure the supplier is actually present on the product
-                # ---------------------------------------------------------
-                seller = next((x for x in product.seller_ids if x.name.id == supplier.id),None)
-                if not seller:
-                    string = 'UPLOAD-AVAILABILITY: availability provided for ean {!s} but the product is not sold by {!s} in OpenERP.'.format(line[1],supplier.name)
-                    self.log.warning(string)
-                    results[index].append(string)
-                    continue
+        # Process all the products
+        # ------------------------
+        for i, line in enumerate(content):
+            i = i + 1
 
 
-                # Commit every 200 products to make sure
-                # lost work in case of problems is limited
-                # ----------------------------------------
-                if i % 200 == 0:
-                    new_cr.commit()
+            # Make sure the product actually exists in OpenERP
+            # ------------------------------------------------
+            self.log.info('UPLOAD-AVAILABILITY: processing product with EAN {!s} ({!s} of {!s})'.format(line[1], i, len(content)))
+            product = next((x for x in products if x.ean13 == line[1]), None)
+            if not product:
+                string = 'UPLOAD-AVAILABILITY: availability provided for ean {!s} but the product is not defined in OpenERP.'.format(line[1])
+                self.log.warning(string)
+                results[index].append(string)
+                continue
+
+            # Make sure the supplier is actually present on the product
+            # ---------------------------------------------------------
+            seller = next((x for x in product.seller_ids if x.name.id == supplier.id),None)
+            if not seller:
+                string = 'UPLOAD-AVAILABILITY: availability provided for ean {!s} but the product is not sold by {!s} in OpenERP.'.format(line[1],supplier.name)
+                self.log.warning(string)
+                results[index].append(string)
+                continue
 
 
-                # Add the availability data
-                # -------------------------
-                vals = { 'state' : 'unavailable' }
-                if line[2] >= 5:
-                    vals['state'] = 'available'
-                elif line[2] >= 2:
-                    vals['state'] = 'limited'
+            # Commit every 200 products to make sure
+            # lost work in case of problems is limited
+            # ----------------------------------------
+            if i % 200 == 0:
+                new_cr.commit()
 
-                # write the new state to the record through product!
-                vals = { 'seller_ids': [[1, seller.id, vals]]}
-                self.write(new_cr, uid, [product.id], vals, context=None)
 
-            new_cr.commit()
-        finally:
-            new_cr.close()
+            # Add the availability data
+            # -------------------------
+            vals = { 'state' : 'unavailable' }
+            if line[2] >= 5:
+                vals['state'] = 'available'
+            elif line[2] >= 2:
+                vals['state'] = 'limited'
+
+            # write the new state to the record through product!
+            vals = { 'seller_ids': [[1, seller.id, vals]]}
+            self.write(new_cr, uid, [product.id], vals, context=None)
+
+        new_cr.commit()
+        #finally:
+        new_cr.close()
         return False
 
 
