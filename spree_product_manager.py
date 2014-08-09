@@ -25,15 +25,11 @@ class spree_product_manager(osv.Model):
             return result
         connection = connection[0]
 
-        log.info('got my connection')
-
         # Collect and push
         # ----------------
         products = self.read(cr, uid, ids, ['id', 'name', 'categ_id', 'description', 'ean13', 'list_price', 'recommended_price', 'cost_price', 'sale_ok', 'change_hash', 'properties', 'images'], context=context)
         properties = self.pool.get('webdust.product.property').browse(cr, uid, [item for sublist in [x['properties'] for x in products] for item in sublist])
         images = self.pool.get('webdust.image').browse(cr, uid, [item for sublist in [x['images'] for x in products] for item in sublist])
-
-        log.info('read mah shit')
 
         calls = []
         for product in products:
@@ -74,7 +70,7 @@ class spree_product_manager(osv.Model):
                 param['product']['available_on'] = '2999/12/31'
 
             calls.append(grequests.put(url, data=json.dumps(param), headers=header))
-        grequests.map(calls, size=50)
+        grequests.map(calls, size=20)
         return result
 
 
