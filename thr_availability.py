@@ -169,9 +169,6 @@ class product(osv.Model):
                 self.write(new_cr, uid, [product.id], vals, context=None)
 
             new_cr.commit()
-        except Exception as e:
-            self.log.warning('shit just went wrong: {!s}'.format(str(e)))
-            self.log.warning(traceback.format_exc())
         finally:
             new_cr.close()
         return False
