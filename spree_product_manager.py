@@ -25,12 +25,15 @@ class spree_product_manager(osv.Model):
             return result
         connection = connection[0]
 
+        log.info('got my connection')
+
         # Collect and push
         # ----------------
         products = self.read(cr, uid, ids, ['id', 'name', 'categ_id', 'description', 'ean13', 'list_price', 'recommended_price', 'cost_price', 'sale_ok', 'change_hash', 'properties', 'images'], context=context)
         properties = self.pool.get('webdust.product.property').browse(cr, uid, [item for sublist in [x['properties'] for x in products] for item in sublist])
         images = self.pool.get('webdust.image').browse(cr, uid, [item for sublist in [x['images'] for x in products] for item in sublist])
 
+        log.info('read mah shit')
 
         calls = []
         for product in products:
@@ -51,7 +54,7 @@ class spree_product_manager(osv.Model):
                                                                           { 'uom': 1, 'date': datetime.datetime.today().strftime('%Y-%m-%d'), })[connection.partner.property_product_pricelist.id]
             param = { 'product' : {
                 'name'        : product['name'],
-                'description' : product['description'],
+                'description' : product['description'] or '',
                 'sku'         : product['ean13'],
                 'price'       : price or product['cost_price']*1.45,
                 'cost_price'  : product['cost_price'],
