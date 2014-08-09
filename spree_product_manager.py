@@ -20,13 +20,13 @@ class spree_product_manager(osv.Model):
         log = logging.getLogger(None)
         settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
         connection = [x for x in settings.connections if x.name == 'SPREE_PRODUCT_MANAGER' and x.is_active == True]
-        log.info('reading connections')
         if not connection:
             log.warning('SPREE_PRODUCT_PUSHER: Could not find the SPREE_PRODUCT_MANAGER connection settings, could not push product to Spree.')
             return result
-        log.info('found_connections')
         connection = connection[0]
-        log.info('yup, still got a connection')
+        log.info('just log the result')
+        return result
+
 
         # Collect and push
         # ----------------
