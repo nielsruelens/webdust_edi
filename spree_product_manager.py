@@ -20,22 +20,19 @@ class spree_product_manager(osv.Model):
         log = logging.getLogger(None)
         settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
         connection = [x for x in settings.connections if x.name == 'SPREE_PRODUCT_MANAGER' and x.is_active == True]
+        log.info('reading connections')
         if not connection:
             log.warning('SPREE_PRODUCT_PUSHER: Could not find the SPREE_PRODUCT_MANAGER connection settings, could not push product to Spree.')
             return result
+        log.info('found_connections')
         connection = connection[0]
+        log.info('yup, still got a connection')
 
         # Collect and push
         # ----------------
-
-        log.info('reading product')
         products = self.read(cr, uid, ids, ['id', 'name', 'categ_id', 'description', 'ean13', 'list_price', 'recommended_price', 'cost_price', 'sale_ok', 'change_hash', 'properties', 'images'], context=context)
-        log.info('reading properties')
         properties = self.pool.get('webdust.product.property').browse(cr, uid, [item for sublist in [x['properties'] for x in products] for item in sublist])
-        log.info('reading images')
         images = self.pool.get('webdust.image').browse(cr, uid, [item for sublist in [x['images'] for x in products] for item in sublist])
-
-        log.info('looping products')
 
         calls = []
         for product in products:
