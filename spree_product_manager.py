@@ -27,50 +27,59 @@ class spree_product_manager(osv.Model):
 
         # Collect and push
         # ----------------
-        products = self.read(cr, uid, ids, ['id', 'name', 'categ_id', 'description', 'ean13', 'list_price', 'recommended_price', 'cost_price', 'sale_ok', 'change_hash', 'properties', 'images'], context=context)
-        properties = self.pool.get('webdust.product.property').browse(cr, uid, [item for sublist in [x['properties'] for x in products] for item in sublist])
-        images = self.pool.get('webdust.image').browse(cr, uid, [item for sublist in [x['images'] for x in products] for item in sublist])
+        try:
+            products = self.read(cr, uid, ids, ['id', 'name', 'categ_id', 'description', 'ean13', 'list_price', 'recommended_price', 'cost_price', 'sale_ok', 'change_hash', 'properties', 'images'], context=context)
+            properties = self.pool.get('webdust.product.property').browse(cr, uid, [item for sublist in [x['properties'] for x in products] for item in sublist])
+            images = self.pool.get('webdust.image').browse(cr, uid, [item for sublist in [x['images'] for x in products] for item in sublist])
+        except Exception as e:
+            log.info('it crashes during the reading of data')
+            log.info(str(e))
 
-        calls = []
-        for product in products:
+        try:
+            calls = []
+            for product in products:
 
-            # Only products whose hash has changed are pushed, unless explicitly asked
-            # ------------------------------------------------------------------------
-            if not context.get('save_anyway', False):
-                if product['change_hash'] == [x['change_hash'] for x in product_hashes if x['id'] == product['id']][0]:
-                    continue
+                # Only products whose hash has changed are pushed, unless explicitly asked
+                # ------------------------------------------------------------------------
+                if not context.get('save_anyway', False):
+                    if product['change_hash'] == [x['change_hash'] for x in product_hashes if x['id'] == product['id']][0]:
+                        continue
 
-            url = '{!s}/{!s}/{!s}'.format(connection.url, str(product['id']), 'push')
-            header = {'content-type': 'application/json', connection.user: connection.password}
+                url = '{!s}/{!s}/{!s}'.format(connection.url, str(product['id']), 'push')
+                header = {'content-type': 'application/json', connection.user: connection.password}
 
-            price = self.pool.get('product.pricelist').price_get(cr, uid, [connection.partner.property_product_pricelist.id],
-                                                                          product['id'],
-                                                                          1.0,
-                                                                          connection.partner.id,
-                                                                          { 'uom': 1, 'date': datetime.datetime.today().strftime('%Y-%m-%d'), })[connection.partner.property_product_pricelist.id]
-            param = { 'product' : {
-                'name'        : product['name'],
-                'description' : product['description'] or '',
-                'sku'         : product['ean13'],
-                'price'       : price or product['cost_price']*1.45,
-                'cost_price'  : product['cost_price'],
-                'recommended_retail_price' : product['recommended_price'],
-                'shipping_category_id' : 1,
-                'categ_id'    : product['categ_id'][0],
-                'properties'  : [],
-                'images'      : [],
-            }, 'interface_name': 'handig'}
+                price = self.pool.get('product.pricelist').price_get(cr, uid, [connection.partner.property_product_pricelist.id],
+                                                                              product['id'],
+                                                                              1.0,
+                                                                              connection.partner.id,
+                                                                              { 'uom': 1, 'date': datetime.datetime.today().strftime('%Y-%m-%d'), })[connection.partner.property_product_pricelist.id]
+                param = { 'product' : {
+                    'name'        : product['name'],
+                    'description' : product['description'] or '',
+                    'sku'         : product['ean13'],
+                    'price'       : price or product['cost_price']*1.45,
+                    'cost_price'  : product['cost_price'],
+                    'recommended_retail_price' : product['recommended_price'],
+                    'shipping_category_id' : 1,
+                    'categ_id'    : product['categ_id'][0],
+                    'properties'  : [],
+                    'images'      : [],
+                }, 'interface_name': 'handig'}
 
-            param['product']['images'] = [x.url for x in images if x.id in [y for y in product['images']]]
-            param['product']['properties'] = [{'name':x.name.name, 'value':x.value} for x in properties if x.id in [y for y in product['properties']] and x.name.visibility == 'external']
+                param['product']['images'] = [x.url for x in images if x.id in [y for y in product['images']]]
+                param['product']['properties'] = [{'name':x.name.name, 'value':x.value} for x in properties if x.id in [y for y in product['properties']] and x.name.visibility == 'external']
 
-            if product['sale_ok']:
-                param['product']['available_on'] = datetime.datetime.today().strftime('%Y/%m/%d')
-            else:
-                param['product']['available_on'] = '2999/12/31'
+                if product['sale_ok']:
+                    param['product']['available_on'] = datetime.datetime.today().strftime('%Y/%m/%d')
+                else:
+                    param['product']['available_on'] = '2999/12/31'
 
-            calls.append(grequests.put(url, data=json.dumps(param), headers=header))
-        grequests.map(calls, size=20)
+                calls.append(grequests.put(url, data=json.dumps(param), headers=header))
+            grequests.map(calls, size=50)
+        except Exception as e:
+            log.info('it crashes during the sending')
+            log.info(str(e))
+
         return result
 
 
