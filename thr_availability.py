@@ -4,6 +4,7 @@ import csv, StringIO
 import threading
 from itertools import chain
 from openerp import pooler
+import traceback
 
 class product(osv.Model):
 
@@ -169,7 +170,8 @@ class product(osv.Model):
 
             new_cr.commit()
         except Exception as e:
-            self.log.warning(str(e))
+            self.log.warning('shit just went wrong: {!s}'.format(str(e)))
+            self.log.warning(traceback.format_exc())
         finally:
             new_cr.close()
         return False
