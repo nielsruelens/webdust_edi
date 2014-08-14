@@ -1,6 +1,7 @@
 from openerp.osv import osv
 from os.path import join
-from os import listdir, path, makedirs
+from os import path, makedirs
+import json
 
 class webdust_edi_post_install(osv.TransientModel):
     _name = "webdust.edi.post.install"
@@ -73,5 +74,10 @@ class webdust_edi_post_install(osv.TransientModel):
             if not external:
                 model_db.create(cr, 1, {'module': 'webdust_edi_manual', 'name':'webdust_thr', 'model':'res.partner', 'res_id':partner.id})
 
-
         return True
+
+
+
+
+
+

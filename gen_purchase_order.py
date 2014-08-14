@@ -590,6 +590,8 @@ class purchase_order(osv.Model):
         order = self.search(cr, uid, [('partner_ref', '=', data['order']['supplierReference'])])
         if not order: return False
         order = self.browse(cr, uid, order[0])
+        if order.state == 'approved':
+            return False
 
         # Confirm the purchase order, regardless of what THR says
         # -------------------------------------------------------
