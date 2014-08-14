@@ -38,6 +38,7 @@
 			<field name="method">edi_import_thr</field>
 			<field name="validator">edi_import_validator</field>
 			<field name="process_after_create">True</field>
+			<field name="allow_duplicates">True</field>
 		</record>
 		<record id="edi_spree_sale_order_in" model="clubit.tools.edi.flow">
 			<field name="name">Sale Order(in)</field>
