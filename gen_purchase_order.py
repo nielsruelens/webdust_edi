@@ -390,9 +390,9 @@ class purchase_order(osv.Model):
             'deliveryMethod'    : '1',
             'amountUntaxed'     : po.amount_untaxed,
             'amountTotal'       : po.amount_total,
-            'expectedDate'      : po.minimum_planned_date,
-            'scheduledDate'     : po.minimum_planned_date,
-            'orderDate'         : po.date_order,
+            'expectedDate'      : po.minimum_planned_date.replace('-',''),
+            'scheduledDate'     : po.minimum_planned_date.replace('-',''),
+            'orderDate'         : po.date_order.replace('-',''),
             'orderPositions'    : [],
         }
 
