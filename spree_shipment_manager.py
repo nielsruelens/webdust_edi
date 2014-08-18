@@ -38,7 +38,7 @@ class spree_shipment_manager(osv.Model):
             url = '{!s}/{!s}/{!s}'.format(connection.url, str(line['product_id']), 'receive')
             header = {'content-type': 'application/json', connection.user: connection.password}
             param = { 'stock_movement' : { 'quantity': line['product_qty'] }, 'interface_name': 'handig'}
-            calls.append(grequests.put(url, data=json.dumps(param), headers=header))
+            calls.append(grequests.post(url, data=json.dumps(param), headers=header))
         grequests.map(calls, size=20)
         return result
 
