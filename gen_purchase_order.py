@@ -590,44 +590,53 @@ class purchase_order(osv.Model):
         order = self.search(cr, uid, [('partner_ref', '=', data['order']['supplierReference'])])
         if not order: return False
         order = self.browse(cr, uid, order[0])
-        if order.state == 'approved':
-            return False
 
         # Confirm the purchase order, regardless of what THR says
+        # if the quotation/PO is still in draft.
         # -------------------------------------------------------
-        wf_service = netsvc.LocalService('workflow')
-        wf_service.trg_validate(uid, 'purchase.order', order.id, 'purchase_confirm', cr)
-        return order.name
+        if order.state == 'draft':
+            wf_service = netsvc.LocalService('workflow')
+            wf_service.trg_validate(uid, 'purchase.order', order.id, 'purchase_confirm', cr)
+            return order.name
 
 
         # The confirmation of the PO should have lead to the creation of an incoming shipment
         # We're now going to receive this incoming shipment according to what THR provided us.
         # In case of shortages, this should automatically create a backorder for easier tracking.
+        # This step is only executed if THR provides the deliveryNumber.
         # ---------------------------------------------------------------------------------------
-        shipment_db = self.pool.get('stock.picking.in')
-        shipment = shipment_db.search(cr, uid, [('purchase_id', '=', order.id)])
+        shipment = self.pool.get('stock.picking.in').search(cr, uid, [('purchase_id', '=', order.id)])
         if not shipment:
             return False
+        shipment = self.pool.get('stock.picking.in').browse(cr, uid, shipment[0])
+        if data['order']['deliveryNumber'] and shipment.state == 'assigned':
+            vals = {}
+            for ship_line in shipment.move_lines:
+                line = [x for x in data['order']['orderPositions'] if x['articleNumber'] == ship_line.product_id.ean13][0]
+                move = {'prodlot_id': False, 'product_id': ship_line.product_id.id, 'product_uom': ship_line.product_uom.id}
+                if line:
+                    move['product_qty'] = float(line['quantity'])
+                    vals["move" + str(ship_line.id)] = move
 
-        vals = {}
-        for order_line in order.order_line:
-            line = [x for x in data['order']['orderPositions'] if x['articleNumber'] == order_line.product_id.ean13]
-            move = {'prodlot_id': False, 'product_id': order_line.product_id.id, 'product_uom': order_line.product_uom.id}
-            if line:
-                move['product_qty'] = line['quantity']
-                vals["move" + str(line.id)] = move
+            # Make the call to do_partial() to set the document to 'done'
+            # -----------------------------------------------------------
+            try:
+                self.pool.get('stock.picking').do_partial(cr, uid, [shipment.id], vals, context)
+            except Exception as e:
+                return False
+            return order.name
 
-        # Make the call to do_partial() to set the document to 'done'
-        # -----------------------------------------------------------
-        try:
-            shipment_db.do_partial(cr, uid, [shipment.id], vals, context)
-        except Exception:
-            return False
+        # If THR supplies the tracking information, we can create a draft invoice
+        # -----------------------------------------------------------------------
+        #if data['order']['trace'] and shipment.invoice_state == '2binvoiced':
+        #    journal = self.pool.get('account.journal').search(cr, uid, [('type', '=','purchase')])
+        #    if not journal:
+        #        return False
+        #    invoice_db = self.pool.get('stock.invoice.onshipping')
+        #    wizard_id = invoice_db.create(cr, uid, {'journal_id':journal[0]})
+        #    invoice_db.open_invoice(cr, uid, wizard_id, context={'active_id':wizard_id, 'active_ids':[wizard_id], 'active_model':'stock.picking.in', 'default_type':'in'})
 
-        # Actually create the sale order
-        # ------------------------------
-        return order.name
-
+        return False
 
 
 
