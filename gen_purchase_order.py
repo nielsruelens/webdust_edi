@@ -606,34 +606,30 @@ class purchase_order(osv.Model):
         # In case of shortages, this should automatically create a backorder for easier tracking.
         # This step is only executed if THR provides the deliveryNumber.
         # ---------------------------------------------------------------------------------------
-        shipment = self.pool.get('stock.picking.in').search(cr, uid, [('purchase_id', '=', order.id)])
-        if not shipment:
+        picking = self.pool.get('stock.picking.in').search(cr, uid, [('purchase_id', '=', order.id)])
+        if not picking:
             return False
-        shipment = self.pool.get('stock.picking.in').browse(cr, uid, shipment[0])
-        if data['order']['deliveryNumber'] and shipment.state == 'assigned':
-            vals = {}
-            for ship_line in shipment.move_lines:
-                line = [x for x in data['order']['orderPositions'] if x['articleNumber'] == ship_line.product_id.ean13][0]
-                move = {'prodlot_id': False, 'product_id': ship_line.product_id.id, 'product_uom': ship_line.product_uom.id}
-                if line:
-                    move['product_qty'] = float(line['quantity'])
-                    vals["move" + str(ship_line.id)] = move
-
-            # Make the call to do_partial() to set the document to 'done'
-            # -----------------------------------------------------------
-            try:
-                self.pool.get('stock.picking').do_partial(cr, uid, [shipment.id], vals, context)
-            except Exception as e:
-                return False
+        picking = self.pool.get('stock.picking.in').browse(cr, uid, picking[0])
+        if data['order']['deliveryNumber'] and picking.state == 'assigned':
+            self.auto_confirm_picking(cr, uid, picking, data, context)
             return order.name
 
         # If THR supplies the tracking information, we need to perform a couple steps:
-        # 1) ship the shipments in Spree
-        # 2) Confirm the outgoing delivery order
-        # 3) Create the invoice
+        # 1) Confirm the outgoing delivery order
+        # 2) Create the invoice
         # -----------------------------------------------------------------------
-        if data['trace'] and shipment.invoice_state == '2binvoiced':
-            self.handle_spree_shipment(cr, uid, order.partner_ref)
+        sale = self.pool.get('sale.order').search(cr, uid, [('client_order_ref', '=', order.partner_ref)])
+        if not sale:
+            return False
+        picking = self.pool.get('stock.picking.out').search(cr, uid, [('sale_id', '=', sale[0])])
+        if not picking:
+            return False
+        picking = self.pool.get('stock.picking.out').browse(cr, uid, picking[0])
+        if data['trace'] and picking.state == 'assigned':
+            self.auto_confirm_picking(cr, uid, picking, data, context)
+            return order.name
+
+        if picking.invoice_state == '2binvoiced':
             return True
         #    journal = self.pool.get('account.journal').search(cr, uid, [('type', '=','purchase')])
         #    if not journal:
@@ -645,39 +641,22 @@ class purchase_order(osv.Model):
         return False
 
 
-    def handle_spree_shipment(self, cr, uid, reference):
-        settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
-        connection = [x for x in settings.connections if x.name == 'SPREE_ORDER_MANAGER' and x.is_active == True]
-        if not connection:
-            return False
-        order_connection = connection[0]
 
-        connection = [x for x in settings.connections if x.name == 'SPREE_SHIPMENT_MANAGER' and x.is_active == True]
-        if not connection:
-            return False
-        shipment_connection = connection[0]
+    def auto_confirm_picking(self, cr, uid, picking, data, context):
+        vals = {}
+        for ship_line in picking.move_lines:
+            line = [x for x in data['order']['orderPositions'] if x['articleNumber'] == ship_line.product_id.ean13][0]
+            move = {'prodlot_id': False, 'product_id': ship_line.product_id.id, 'product_uom': ship_line.product_uom.id}
+            if line:
+                move['product_qty'] = float(line['quantity'])
+                vals["move" + str(ship_line.id)] = move
 
-        url = '{!s}/{!s}'.format(order_connection.url, reference)
-        header = {'content-type': 'application/json', order_connection.user: order_connection.password}
-
+        # Make the call to do_partial() to set the document to 'done'
+        # -----------------------------------------------------------
         try:
-            r = requests.get(url, headers=header)
+            self.pool.get('stock.picking').do_partial(cr, uid, [picking.id], vals, context=context)
         except Exception as e:
             return False
-        if r.status_code != 200:
-            return False
-        response = json.loads(r.text)
-
-        calls = []
-        for shipment in response['shipments']:
-            if shipment['state'] != 'ready':
-                continue
-            header = {'content-type': 'application/json', shipment_connection.user: shipment_connection.password}
-            url = '{!s}/{!s}/ship'.format(shipment_connection.url, shipment['number'])
-            calls.append(grequests.put(url, headers=header))
-        if calls:
-            grequests.map(calls, size=50)
-
         return True
 
 
