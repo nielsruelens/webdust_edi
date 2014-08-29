@@ -107,7 +107,7 @@ class purchase_order(osv.Model):
 
     def create(self, cr, uid, vals, context=None):
         ''' purchase.order:create()
-        ---------------------------
+          ---------------------------
         This method is overwritten to make sure auto_edi_allowed
         is marked as true, *if* the PO is made using the MRP scheduler.
         --------------------------------------------------------------- '''
@@ -632,7 +632,7 @@ class purchase_order(osv.Model):
         # 2) Confirm the outgoing delivery order
         # 3) Create the invoice
         # -----------------------------------------------------------------------
-        if data['order']['trace'] and shipment.invoice_state == '2binvoiced':
+        if data['trace'] and shipment.invoice_state == '2binvoiced':
             self.handle_spree_shipment(cr, uid, order.partner_ref)
             return True
         #    journal = self.pool.get('account.journal').search(cr, uid, [('type', '=','purchase')])
@@ -664,7 +664,7 @@ class purchase_order(osv.Model):
             r = requests.get(url, headers=header)
         except Exception as e:
             return False
-        if r.status_code != '200':
+        if r.status_code != 200:
             return False
         response = json.loads(r.text)
 
