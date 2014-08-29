@@ -13,5 +13,5 @@ import thr_availability
 import settings
 import spree_sale_order
 import spree_product_manager
-import spree_shipment_manager
+import spree_stock_manager
 import post_install

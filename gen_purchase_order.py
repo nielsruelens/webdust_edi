@@ -5,6 +5,7 @@ from itertools import groupby
 import logging
 import json
 import requests
+import grequests
 import datetime
 import time
 
@@ -626,9 +627,14 @@ class purchase_order(osv.Model):
                 return False
             return order.name
 
-        # If THR supplies the tracking information, we can create a draft invoice
+        # If THR supplies the tracking information, we need to perform a couple steps:
+        # 1) ship the shipments in Spree
+        # 2) Confirm the outgoing delivery order
+        # 3) Create the invoice
         # -----------------------------------------------------------------------
-        #if data['order']['trace'] and shipment.invoice_state == '2binvoiced':
+        if data['order']['trace'] and shipment.invoice_state == '2binvoiced':
+            self.handle_spree_shipment(cr, uid, order.partner_ref)
+            return True
         #    journal = self.pool.get('account.journal').search(cr, uid, [('type', '=','purchase')])
         #    if not journal:
         #        return False
@@ -638,6 +644,41 @@ class purchase_order(osv.Model):
 
         return False
 
+
+    def handle_spree_shipment(self, cr, uid, reference):
+        settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
+        connection = [x for x in settings.connections if x.name == 'SPREE_ORDER_MANAGER' and x.is_active == True]
+        if not connection:
+            return False
+        order_connection = connection[0]
+
+        connection = [x for x in settings.connections if x.name == 'SPREE_SHIPMENT_MANAGER' and x.is_active == True]
+        if not connection:
+            return False
+        shipment_connection = connection[0]
+
+        url = '{!s}/{!s}'.format(order_connection.url, reference)
+        header = {'content-type': 'application/json', order_connection.user: order_connection.password}
+
+        try:
+            r = requests.get(url, headers=header)
+        except Exception as e:
+            return False
+        if r.status_code != '200':
+            return False
+        response = json.loads(r.text)
+
+        calls = []
+        for shipment in response['shipments']:
+            if shipment['state'] != 'ready':
+                continue
+            header = {'content-type': 'application/json', shipment_connection.user: shipment_connection.password}
+            url = '{!s}/{!s}/ship'.format(shipment_connection.url, shipment['number'])
+            calls.append(grequests.put(url, headers=header))
+        if calls:
+            grequests.map(calls, size=50)
+
+        return True
 
 
     def create_outgoing_edi_document(self, cr, uid, content):

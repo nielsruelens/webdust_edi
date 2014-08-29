@@ -5,7 +5,7 @@ import json
 from openerp.tools.translate import _
 
 
-class spree_shipment_manager(osv.Model):
+class spree_stock_manager(osv.Model):
     _name = "stock.picking"
     _inherit = "stock.picking"
 
@@ -17,15 +17,15 @@ class spree_shipment_manager(osv.Model):
 
         # Call the super method
         # ---------------------
-        result = super(spree_shipment_manager, self).do_partial(cr, uid,ids, partial_datas, context)
+        result = super(spree_stock_manager, self).do_partial(cr, uid,ids, partial_datas, context)
 
         # Read customizing
         # ----------------
         log = logging.getLogger(None)
         settings = self.pool.get('clubit.tools.settings').get_settings(cr, uid)
-        connection = [x for x in settings.connections if x.name == 'SPREE_SHIPMENT_MANAGER' and x.is_active == True]
+        connection = [x for x in settings.connections if x.name == 'SPREE_PRODUCT_MANAGER' and x.is_active == True]
         if not connection:
-            log.warning('SPREE_SHIPMENT_MANAGER: Could not find the SPREE_SHIPMENT_MANAGER connection settings, could not push shipment to Spree.')
+            log.warning('SPREE_STOCK_MANAGER: Could not find the SPREE_PRODUCT_MANAGER connection settings, could not push shipment to Spree.')
             return result
         connection = connection[0]
 
