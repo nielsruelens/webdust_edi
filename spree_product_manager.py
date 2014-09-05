@@ -12,6 +12,7 @@ class spree_product_manager(osv.Model):
 
     def write(self, cr, uid, ids, vals, context=None):
         if not context: context = {}
+        product_hashes = self.read(cr, uid, ids, ['id', 'change_hash'], context=context)
         result = super(spree_product_manager, self).write(cr, uid,ids, vals, context)
 
         # Read customizing
@@ -29,7 +30,7 @@ class spree_product_manager(osv.Model):
         # ----------------------------
         products_param = []
         if not context.get('only_prices', False):
-            products_param = self.full_extract(cr, uid, ids, connection.partner, context)
+            products_param = self.full_extract(cr, uid, ids, connection.partner, product_hashes, context)
         else:
             products_param = self.price_extract(cr, uid, ids, connection.partner, context)
 
@@ -47,10 +48,9 @@ class spree_product_manager(osv.Model):
 
 
 
-    def full_extract(self, cr, uid, ids, partner, context):
+    def full_extract(self, cr, uid, ids, partner, product_hashes, context):
         data = []
 
-        product_hashes = self.read(cr, uid, ids, ['id', 'change_hash'], context=context)
         products = self.read(cr, uid, ids, ['id', 'name', 'categ_id', 'description', 'ean13', 'list_price', 'recommended_price', 'cost_price', 'sale_ok', 'change_hash', 'properties', 'images'], context=context)
         properties = self.pool.get('webdust.product.property').browse(cr, uid, [item for sublist in [x['properties'] for x in products] for item in sublist])
         images = self.pool.get('webdust.image').browse(cr, uid, [item for sublist in [x['images'] for x in products] for item in sublist])
