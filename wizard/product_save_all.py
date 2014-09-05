@@ -29,7 +29,10 @@ class webdust_product_save_all(osv.TransientModel):
 
         context['save_anyway'] = True
         context['only_prices'] = wizard.only_prices
-        products = prod_db.search(new_cr, uid, [], context=context)
+        if wizard.only_prices:
+            products = prod_db.search(new_cr, uid, [('sale_ok','=', True)], context=context)
+        else:
+            products = prod_db.search(new_cr, uid, [], context=context)
 
         offset = wizard.offset
         size = wizard.size
