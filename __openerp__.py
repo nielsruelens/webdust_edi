@@ -26,7 +26,7 @@
         'config.xml',
         'settings.xml',
         'schedulers.xml',
-        'post_install.xml'
+#        'post_install.xml'
     ],
     'demo': [
     ],
