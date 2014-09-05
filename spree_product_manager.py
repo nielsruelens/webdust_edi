@@ -73,7 +73,7 @@ class spree_product_manager(osv.Model):
                 'name'        : product['name'],
                 'description' : product['description'] or '',
                 'sku'         : product['ean13'],
-                'price'       : price or product['cost_price']*1.45,
+                'price'       : price or product['cost_price']*1.55,
                 'cost_price'  : product['cost_price'],
                 'recommended_retail_price' : product['recommended_price'],
                 'shipping_category_id' : 1,
@@ -97,17 +97,15 @@ class spree_product_manager(osv.Model):
 
     def price_extract(self, cr, uid, ids, partner, context):
         data = []
+        price_db = self.pool.get('product.pricelist')
         products = self.read(cr, uid, ids, ['id', 'cost_price'], context=context)
+        now = datetime.datetime.today().strftime('%Y-%m-%d')
+        prices = price_db.price_get_multi(cr, uid, pricelist_ids=[partner.property_product_pricelist.id],
+                                          products_by_qty_by_partner=[(x['id'], 1.0, partner.id) for x in products], context=context)
         for product in products:
-
-            price = self.pool.get('product.pricelist').price_get(cr, uid, [partner.property_product_pricelist.id],
-                                                                          product['id'],
-                                                                          1.0,
-                                                                          partner.id,
-                                                                          { 'uom': 1, 'date': datetime.datetime.today().strftime('%Y-%m-%d'), })[partner.property_product_pricelist.id]
             param = {
                 'id'    : str(product['id']),
-                'price' : price or product['cost_price']*1.45,
+                'price' : prices[product['id']][1L] or product['cost_price']*1.55,
             }
             data.append(param)
         return data
