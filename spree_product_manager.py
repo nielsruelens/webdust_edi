@@ -32,6 +32,7 @@ class spree_product_manager(osv.Model):
         images = self.pool.get('webdust.image').browse(cr, uid, [item for sublist in [x['images'] for x in products] for item in sublist])
 
         calls = []
+        products_param = []
         for product in products:
 
             # Only products whose hash has changed are pushed, unless explicitly asked
@@ -42,7 +43,7 @@ class spree_product_manager(osv.Model):
 
 
 
-            url = '{!s}/{!s}/{!s}'.format(connection.url, str(product['id']), 'push')
+            url = '{!s}/{!s}'.format(connection.url,  'push_bulk')
             header = {'content-type': 'application/json', connection.user: connection.password}
 
             price = self.pool.get('product.pricelist').price_get(cr, uid, [connection.partner.property_product_pricelist.id],
@@ -50,7 +51,8 @@ class spree_product_manager(osv.Model):
                                                                           1.0,
                                                                           connection.partner.id,
                                                                           { 'uom': 1, 'date': datetime.datetime.today().strftime('%Y-%m-%d'), })[connection.partner.property_product_pricelist.id]
-            param = { 'product' : {
+            param = { 
+                'id'          : str(product['id']),
                 'name'        : product['name'],
                 'description' : product['description'] or '',
                 'sku'         : product['ean13'],
@@ -61,18 +63,26 @@ class spree_product_manager(osv.Model):
                 'categ_id'    : product['categ_id'][0],
                 'properties'  : [],
                 'images'      : [],
-            }, 'interface_name': 'handig'}
+            } 
 
-            param['product']['images'] = [x.url for x in images if x.id in [y for y in product['images']]]
-            param['product']['properties'] = [{'name':x.name.name, 'value':x.value} for x in properties if x.id in [y for y in product['properties']] and x.name.visibility == 'external']
+            param['images'] = [x.url for x in images if x.id in [y for y in product['images']]]
+            param['properties'] = [{'name':x.name.name, 'value':x.value} for x in properties if x.id in [y for y in product['properties']] and x.name.visibility == 'external']
 
             if product['sale_ok']:
-                param['product']['available_on'] = datetime.datetime.today().strftime('%Y/%m/%d')
+                param['available_on'] = datetime.datetime.today().strftime('%Y/%m/%d')
             else:
-                param['product']['available_on'] = '2999/12/31'
-
-            calls.append(grequests.put(url, data=json.dumps(param), headers=header))
-        grequests.map(calls, size=50)
+                param['available_on'] = '2999/12/31'
+            
+            products_param.append(param)
+        
+        param = {
+            'products': products_param,
+            'interface_name': 'handig'
+        }
+        calls.append(grequests.put(url, data=json.dumps(param), headers=header))
+        log.info(param)
+        responses = grequests.map(calls, size=50)
+        log.info(map(lambda x: x.text, responses))
 
         return result
 

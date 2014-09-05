@@ -1,11 +1,15 @@
 import threading
 from openerp import pooler
 import logging
-from openerp.osv import osv
+from openerp.osv import osv, fields
 
 class webdust_product_save_all(osv.TransientModel):
     _name = 'webdust.product.save.all'
     _description = 'Mass save every product in the DB'
+    
+    _columns = {
+        'only_prices' : fields.boolean('Save pricing only'),
+    }
 
     def _background(self, cr, uid, ids, context={}):
         log = logging.getLogger(None)
@@ -15,10 +19,18 @@ class webdust_product_save_all(osv.TransientModel):
 
         context['save_anyway'] = True
         products = prod_db.search(new_cr, uid, [], context=context)
-        for i in xrange(0, len(products), 1000):
-            log.info('MASS-PRODUCT-SAVE: saving products {!s} to {!s} of {!s}.'.format(i,i+1000, len(products)))
-            prod_db.write(new_cr, uid, products[i:i+1000], {}, context=context)
-
+        
+        offset = 0
+        size = len(products)
+        page_size = 1000
+        offset = 10000
+        size = 50
+        page_size = 10
+        for i in xrange(offset, size, page_size):
+            log.info('MASS-PRODUCT-SAVE: saving products {!s} to {!s} of {!s}.'.format(i,i+page_size, size))
+            # make sure product data is up-to-date
+            prod_db.write(new_cr, uid, products[i:i+page_size], {}, context=context)
+            
         new_cr.commit()
         new_cr.close()
         log.info('MASS-PRODUCT-SAVE: mass save is complete.')

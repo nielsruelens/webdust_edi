@@ -7,6 +7,9 @@
             <field name="model">webdust.product.save.all</field>
             <field name="arch" type="xml">
                 <form string="Mass save all products" version="7.0">
+                    <group col="2">
+				        <field name="only_prices" />
+                    </group>
                     <footer>
                         <button name="start" string="Start" type="object" class="oe_highlight" />
                         or
