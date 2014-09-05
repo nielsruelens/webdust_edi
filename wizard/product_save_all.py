@@ -16,7 +16,7 @@ class webdust_product_save_all(osv.TransientModel):
 
     _defaults = {
         'offset' : 0,
-        'page_size' : 0,
+        'page_size' : 1000,
         'size': lambda self,cr,uid,c: len(self.pool.get('product.product').search(cr, uid, [])),
     }
 
@@ -28,6 +28,7 @@ class webdust_product_save_all(osv.TransientModel):
         wizard = self.browse(new_cr, uid, ids[0])
 
         context['save_anyway'] = True
+        context['only_prices'] = wizard.only_prices
         products = prod_db.search(new_cr, uid, [], context=context)
 
         offset = wizard.offset
