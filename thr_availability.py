@@ -125,6 +125,9 @@ class product(osv.Model):
 
             # Process all the products
             # ------------------------
+            newly_available = []
+            newly_limited = []
+            newly_unavailable = []
             for i, line in enumerate(content):
                 i = i + 1
 
@@ -149,26 +152,33 @@ class product(osv.Model):
                     continue
 
 
-                # Commit every 200 products to make sure
-                # lost work in case of problems is limited
-                # ----------------------------------------
-                if i % 200 == 0:
-                    new_cr.commit()
-
-
-                # Add the availability data
-                # -------------------------
-                vals = { 'state' : 'unavailable' }
+                # Calculate the availability
+                # --------------------------
+                new_state = 'unavailable'
                 if int(line[2]) >= 5:
-                    vals['state'] = 'available'
+                    new_state = 'available'
                 elif int(line[2]) >= 2:
-                    vals['state'] = 'limited'
+                    new_state = 'limited'
 
-                # write the new state to the record through product!
-                vals = { 'seller_ids': [[1, seller.id, vals]]}
-                self.write(new_cr, uid, [product.id], vals, context=None)
+                # Does the product need to be updated?
+                # ------------------------------------
+                if new_state <> seller.state:
+                    if new_state == 'unavailable':
+                        newly_unavailable.append(product.id)
+                    elif new_state == 'available':
+                        newly_available.append(product.id)
+                    else:
+                        newly_limited.append(product.id)
 
-                new_cr.commit()
+            if newly_unavailable:
+                self.write(new_cr, uid, newly_unavailable, { 'seller_ids': [[1, seller.id, { 'state' : 'unavailable' }]]}, context={'only_availability':True})
+            if newly_available:
+                self.write(new_cr, uid, newly_unavailable, { 'seller_ids': [[1, seller.id, { 'state' : 'available' }]]}, context={'only_availability':True})
+            if newly_limited:
+                self.write(new_cr, uid, newly_unavailable, { 'seller_ids': [[1, seller.id, { 'state' : 'limited' }]]}, context={'only_availability':True})
+
+            new_cr.commit()
+
         finally:
             new_cr.close()
         return False

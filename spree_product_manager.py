@@ -29,10 +29,12 @@ class spree_product_manager(osv.Model):
         # lightweight pricing or full?
         # ----------------------------
         products_param = []
-        if not context.get('only_prices', False):
-            products_param = self.full_extract(cr, uid, ids, connection.partner, product_hashes, context)
-        else:
+        if context.get('only_prices', False):
             products_param = self.price_extract(cr, uid, ids, connection.partner, context)
+        elif context.get('only_availability', False):
+            products_param = self.availability_extract(cr, uid, ids, connection.partner, context)
+        else:
+            products_param = self.full_extract(cr, uid, ids, connection.partner, product_hashes, context)
 
         param = {'products': products_param, 'interface_name': 'handig'}
         url = '{!s}/{!s}'.format(connection.url,  'push_bulk')
@@ -99,7 +101,6 @@ class spree_product_manager(osv.Model):
         data = []
         price_db = self.pool.get('product.pricelist')
         products = self.read(cr, uid, ids, ['id', 'cost_price'], context=context)
-        now = datetime.datetime.today().strftime('%Y-%m-%d')
         prices = price_db.price_get_multi(cr, uid, pricelist_ids=[partner.property_product_pricelist.id],
                                           products_by_qty_by_partner=[(x['id'], 1.0, partner.id) for x in products], context=context)
         for product in products:
@@ -107,6 +108,19 @@ class spree_product_manager(osv.Model):
                 'id'    : str(product['id']),
                 'price' : prices[product['id']][1L] or product['cost_price']*1.55,
             }
+            data.append(param)
+        return data
+
+
+    def availability_extract(self, cr, uid, ids, partner, context):
+        data = []
+        products = self.read(cr, uid, ids, ['id', 'sale_ok'], context=context)
+        for product in products:
+            param = {'id': str(product['id'])}
+            if product['sale_ok']:
+                param['available_on'] = datetime.datetime.today().strftime('%Y/%m/%d')
+            else:
+                param['available_on'] = '2999/12/31'
             data.append(param)
         return data
 
