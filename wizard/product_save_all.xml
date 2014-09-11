@@ -8,7 +8,7 @@
             <field name="arch" type="xml">
                 <form string="Mass save all products" version="7.0">
                     <group>
-				        <field name="only_prices" />
+				        <field name="option" />
 				        <field name="offset" />
 				        <field name="size" />
 				        <field name="page_size" />

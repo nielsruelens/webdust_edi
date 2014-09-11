@@ -8,7 +8,7 @@ class webdust_product_save_all(osv.TransientModel):
     _description = 'Mass save every product in the DB'
 
     _columns = {
-        'only_prices' : fields.boolean('Save pricing only'),
+        'option' : fields.selection([('pricing','Pricing Only'), ('availability','Availability Only')], 'Option'),
         'offset' : fields.integer('Offset'),
         'size' : fields.integer('Size'),
         'page_size' : fields.integer('Page size')
@@ -28,8 +28,12 @@ class webdust_product_save_all(osv.TransientModel):
         wizard = self.browse(new_cr, uid, ids[0])
 
         context['save_anyway'] = True
-        context['only_prices'] = wizard.only_prices
-        if wizard.only_prices:
+        if wizard.option == 'pricing':
+            context['only_prices'] = True
+        elif wizard.option == 'availability':
+            context['only_availability'] = True
+
+        if wizard.option == 'pricing':
             products = prod_db.search(new_cr, uid, [('sale_ok','=', True)], context=context)
         else:
             products = prod_db.search(new_cr, uid, [], context=context)
