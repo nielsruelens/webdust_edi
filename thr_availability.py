@@ -113,6 +113,7 @@ class product(osv.Model):
         # Create a new cursor for this thread
         # -----------------------------------
         new_cr = pooler.get_db(cr.dbname).cursor()
+        supplier_db = self.pool.get('product.supplierinfo')
 
         try:
 
@@ -125,9 +126,7 @@ class product(osv.Model):
 
             # Process all the products
             # ------------------------
-            newly_available = []
-            newly_limited = []
-            newly_unavailable = []
+            to_update = []
             for i, line in enumerate(content):
                 i = i + 1
 
@@ -163,31 +162,18 @@ class product(osv.Model):
                 # Does the product need to be updated?
                 # ------------------------------------
                 if new_state <> seller.state:
-                    if new_state == 'unavailable':
-                        newly_unavailable.append(product.id)
-                    elif new_state == 'available':
-                        newly_available.append(product.id)
-                    else:
-                        newly_limited.append(product.id)
+                    supplier_db.write(new_cr, uid, seller.id, {'state': new_state}, context=None)
+                    to_update.append(product.id)
 
-            if newly_unavailable:
-                self.write(new_cr, uid, newly_unavailable, { 'seller_ids': [[1, seller.id, { 'state' : 'unavailable' }]]}, context={'only_availability':True})
-            if newly_available:
-                self.write(new_cr, uid, newly_available, { 'seller_ids': [[1, seller.id, { 'state' : 'available' }]]}, context={'only_availability':True})
-            if newly_limited:
-                self.write(new_cr, uid, newly_limited, { 'seller_ids': [[1, seller.id, { 'state' : 'limited' }]]}, context={'only_availability':True})
+
+            if to_update:
+                self.write(new_cr, uid, to_update, {}, context={'only_availability':True})
 
             new_cr.commit()
 
         finally:
             new_cr.close()
         return False
-
-
-
-
-
-
 
 
 
