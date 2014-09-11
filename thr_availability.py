@@ -173,9 +173,9 @@ class product(osv.Model):
             if newly_unavailable:
                 self.write(new_cr, uid, newly_unavailable, { 'seller_ids': [[1, seller.id, { 'state' : 'unavailable' }]]}, context={'only_availability':True})
             if newly_available:
-                self.write(new_cr, uid, newly_unavailable, { 'seller_ids': [[1, seller.id, { 'state' : 'available' }]]}, context={'only_availability':True})
+                self.write(new_cr, uid, newly_available, { 'seller_ids': [[1, seller.id, { 'state' : 'available' }]]}, context={'only_availability':True})
             if newly_limited:
-                self.write(new_cr, uid, newly_unavailable, { 'seller_ids': [[1, seller.id, { 'state' : 'limited' }]]}, context={'only_availability':True})
+                self.write(new_cr, uid, newly_limited, { 'seller_ids': [[1, seller.id, { 'state' : 'limited' }]]}, context={'only_availability':True})
 
             new_cr.commit()
 
