@@ -36,6 +36,10 @@ class spree_product_manager(osv.Model):
         else:
             products_param = self.full_extract(cr, uid, ids, connection.partner, product_hashes, context)
 
+        if not products_param:
+            log.info('SPREE_PRODUCT_PUSHER: Nothing to update.')
+            return result
+
         param = {'products': products_param, 'interface_name': 'handig'}
         url = '{!s}/{!s}'.format(connection.url,  'push_bulk')
         header = {'content-type': 'application/json', connection.user: connection.password}
