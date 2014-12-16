@@ -206,7 +206,7 @@ class sale_order(osv.Model):
         desired = today+datetime.timedelta(days=2)
         if 'customer_delivery_date' in data and data['customer_delivery_date']:
             desiredTemp = time.strptime(data['customer_delivery_date'][0:10], '%Y-%m-%d')
-            desiredTemp = datetime.datetime.fromtimestamp(time.mktime(desired))
+            desiredTemp = datetime.datetime.fromtimestamp(time.mktime(desiredTemp))
             desired = desired.replace(desiredTemp.year, desiredTemp.month, desiredTemp.day)
         vals['desired_delivery_date'] = desired.strftime('%Y-%m-%d %H:%M:%S')
 
