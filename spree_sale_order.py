@@ -203,13 +203,12 @@ class sale_order(osv.Model):
         }
 
         today = datetime.datetime.now()
+        desired = today+datetime.timedelta(days=2)
         if 'customer_delivery_date' in data and data['customer_delivery_date']:
-            vals['desired_delivery_date'] = data['customer_delivery_date'][0:10]
-            desired = time.strptime(vals['desired_delivery_date'], '%Y-%m-%d')
-            desired = datetime.datetime.fromtimestamp(time.mktime(desired))
-        else:
-            desired = today+datetime.timedelta(days=2)
-            vals['desired_delivery_date'] = desired.strftime('%Y-%m-%d %H:%M:%S')
+            desiredTemp = time.strptime(data['customer_delivery_date'][0:10], '%Y-%m-%d')
+            desiredTemp = datetime.datetime.fromtimestamp(time.mktime(desired))
+            desired = desired.replace(desiredTemp.year, desiredTemp.month, desiredTemp.day)
+        vals['desired_delivery_date'] = desired.strftime('%Y-%m-%d %H:%M:%S')
 
 
         for line in data['line_items']:
@@ -225,7 +224,7 @@ class sale_order(osv.Model):
                 'price_unit'      : line['price'],
                 'name'            : line['variant']['name'],
                 'th_weight'       : product.weight * line['quantity'],
-                'delay'           : (desired - today).days + 1,
+                'delay'           : (desired - today).days,
                 'tax_id'          : [[6, False, self.pool.get('account.fiscal.position').map_tax(cr, uid, shipping_partner.property_account_position, product.taxes_id)   ]],
             }
 
