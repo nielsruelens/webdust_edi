@@ -8,6 +8,7 @@ import requests
 import grequests
 import datetime
 import time
+import re
 
 #       +-------------------------+     +-------------------+
 #       |  push_quotations_manual |     |  push_quotations  |
@@ -117,9 +118,10 @@ class purchase_order(osv.Model):
 
         if vals['origin']:
             sale_db = self.pool.get('sale.order')
-            sale_order = sale_db.search(cr, uid, [('name','=',vals['origin'])])
-            if sale_order:
-                sale_order = sale_db.read(cr, uid, sale_order, ['desired_delivery_date'], context=context)[0]
+            sale_order_name = re.search('SO\d*', vals['origin'])
+            if sale_order_name:
+                ids = sale_db.search(cr, uid, [('name','=',sale_order_name.group(0))])
+            for sale_order in sale_db.read(cr, uid, ids, ['desired_delivery_date'], context=context):
                 if sale_order['desired_delivery_date']:
                     for i, line in enumerate(vals['order_line']):
                         line[2]['date_planned'] = sale_order['desired_delivery_date']
@@ -376,10 +378,11 @@ class purchase_order(osv.Model):
         # Lookup the sale order
         # ---------------------
         sale_db = self.pool.get('sale.order')
-        sale_order = sale_db.search(cr, uid, [('name','=', po.origin)])
-        if sale_order:
-            sale_order = sale_db.browse(cr, uid, sale_order[0])
-
+        sale_order_name = re.search('SO\d*', po.origin)
+        if sale_order_name:
+            ids = sale_db.search(cr, uid, [('name','=', sale_order_name.group(0))])
+            if ids: 
+                sale_order = sale_db.browse(cr, uid, ids[0])
 
         # Header fields
         # -------------
