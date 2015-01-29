@@ -1,4 +1,4 @@
-from openerp.osv import osv
+from openerp.osv import osv,fields
 from openerp.tools.translate import _
 import csv, StringIO
 import threading
@@ -49,18 +49,12 @@ class product(osv.Model):
             self.pool.get('crm.helpdesk').create_simple_case(cr, uid, 'These warnings generated during the THR availability upload need to be validated.', warning)
         return True
 
-
-
-
-
-
     def upload_availability(self, cr, uid, supplier, content=[], context=None):
         ''' product.product:upload_availability()
             -------------------------------------
             This method is the root process node
             for the availability upload for a given supplier.
             ------------------------------------------------- '''
-
         if not content or not supplier:
             return False
 
@@ -95,9 +89,6 @@ class product(osv.Model):
         self.log.info('UPLOAD-AVAILABILITY: All threads have finished.')
         return results
 
-
-
-
     def _content_thread_availability(self, cr, uid, supplier, content, results, index, context=None):
         ''' product.product:_content_thread_availability()
         --------------------------------------------------
@@ -116,20 +107,17 @@ class product(osv.Model):
         supplier_db = self.pool.get('product.supplierinfo')
 
         try:
-
             # Get all the ids + content for all the products that already exist.
             # ------------------------------------------------------------------
             self.log.info('UPLOAD-AVAILABILITY: reading products.')
             prod_ids = self.search(new_cr, uid, [('ean13', 'in', [ x[1] for x in content ])])
             products = self.browse(new_cr, uid, prod_ids, context=context)
 
-
             # Process all the products
             # ------------------------
             to_update = []
             for i, line in enumerate(content):
                 i = i + 1
-
 
                 # Make sure the product actually exists in OpenERP
                 # ------------------------------------------------
@@ -150,7 +138,6 @@ class product(osv.Model):
                     results[index].append(string)
                     continue
 
-
                 # Calculate the availability
                 # --------------------------
                 new_state = 'unavailable'
@@ -159,12 +146,15 @@ class product(osv.Model):
                 elif int(line[2]) >= 2:
                     new_state = 'limited'
 
+                # Set supplier on hand qty
+                # ------------------------
+                on_hand_qty = line[2]
+
                 # Does the product need to be updated?
                 # ------------------------------------
                 if new_state <> seller.state:
                     supplier_db.write(new_cr, uid, seller.id, {'state': new_state}, context=None)
                     to_update.append(product.id)
-
 
             if to_update:
                 self.write(new_cr, uid, to_update, {}, context={'only_availability':True})
@@ -174,7 +164,4 @@ class product(osv.Model):
         finally:
             new_cr.close()
         return False
-
-
-
 
