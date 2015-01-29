@@ -364,8 +364,6 @@ class purchase_order(osv.Model):
 
         return True
 
-
-
     def edi_export(self, cr, uid, po, context=None):
         ''' purchase.order:edi_export()
         -------------------------------
@@ -418,6 +416,8 @@ class purchase_order(osv.Model):
                 edi_doc['shippingAddress']['company'] = sale_order.partner_id.parent_id.name
                 edi_doc['shippingAddress']['vat']     = sale_order.partner_id.parent_id.vat
 
+            # remove shippingAddress fields where value equals False
+            edi_doc['shippingAddress'] = { k:v for k, v in edi_doc['shippingAddress'].items() if v }
 
 
         # Line items
