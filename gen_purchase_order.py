@@ -8,6 +8,7 @@ import requests
 import grequests
 import datetime
 import time
+import re
 
 #       +-------------------------+     +-------------------+
 #       |  push_quotations_manual |     |  push_quotations  |
@@ -60,51 +61,6 @@ class purchase_order(osv.Model):
     }
 
 
-# Dead code, but keeping it anyways
-# MRP logic is way more complex than this
-#    def create(self, cr, uid, vals, context=None):
-#        ''' purchase.order:create()
-#        ---------------------------
-#        This method is overwritten to make sure the correct
-#        partner is chosen. The default MRP logic simply chooses
-#        the first partner, not the cheapest, fastest, ...
-#        ------------------------------------------------------- '''
-#
-#        # Only execute the custom code if we're in the MPR process
-#        # --------------------------------------------------------
-#        stack = inspect.stack()
-#        if stack[1][3] == 'create_procurement_purchase_order':
-#            supplier = self.determine_ideal_partner(cr, uid, vals)
-#            vals['partner_id'] = supplier.name.id
-#            vals['order_line'][0][2]['price_unit'] = supplier.default_price
-#
-#        return super(purchase_order, self).create(cr, uid, vals, context)
-#
-#
-#    def determine_ideal_partner(self, cr, uid, vals):
-#        ''' purchase.order:determine_ideal_partner()
-#        --------------------------------------------
-#        Given a set of values that will become a PO, this method
-#        determines the ideal partner in case "lowest price" is
-#        chosen for the product.
-#        -------------------------------------------------------- '''
-#
-#        prod_db = self.pool.get('product.product')
-#        product = prod_db.browse(cr, uid, vals['order_line'][0][2]['product_id'] )
-#        if product.cost_method != 'lowest':
-#            return vals['partner_id']
-#
-#        lowest_supplier = False
-#        for supplier in product.seller_ids:
-#            if supplier.state == 'unavailable': continue
-#            if not lowest_supplier:
-#                lowest_supplier = supplier
-#                continue
-#            if supplier.default_price < lowest_supplier.default_price:
-#                lowest_supplier = supplier
-#
-#        return lowest_supplier
-
     def create(self, cr, uid, vals, context=None):
         ''' purchase.order:create()
           ---------------------------
@@ -117,9 +73,10 @@ class purchase_order(osv.Model):
 
         if vals['origin']:
             sale_db = self.pool.get('sale.order')
-            sale_order = sale_db.search(cr, uid, [('name','=',vals['origin'])])
-            if sale_order:
-                sale_order = sale_db.read(cr, uid, sale_order, ['desired_delivery_date'], context=context)[0]
+            sale_order_name = re.search('SO\d*', vals['origin'])
+            if sale_order_name:
+                ids = sale_db.search(cr, uid, [('name','=',sale_order_name.group(0))])
+            for sale_order in sale_db.read(cr, uid, ids, ['desired_delivery_date'], context=context):
                 if sale_order['desired_delivery_date']:
                     for i, line in enumerate(vals['order_line']):
                         line[2]['date_planned'] = sale_order['desired_delivery_date']
@@ -131,6 +88,7 @@ class purchase_order(osv.Model):
             if 'mrp_scheduler' in context:
                 vals['auto_edi_allowed'] = True
         return super(purchase_order, self).write(cr, uid,ids, vals, context)
+
 
     def copy(self, cr, uid, id, default=None, context=None):
         ''' purchase.order:copy_data
@@ -225,7 +183,6 @@ class purchase_order(osv.Model):
         return True
 
 
-
     def push_several_thr(self, cr, uid, orders):
 
         log = logging.getLogger(None)
@@ -288,7 +245,6 @@ class purchase_order(osv.Model):
         cr.commit()
         log.info('QUOTATION_PUSHER: Processing is done.')
         return True
-
 
 
     def push_single_thr(self, cr, uid, order, connection, http_connection, case = None):
@@ -364,6 +320,7 @@ class purchase_order(osv.Model):
 
         return True
 
+
     def edi_export(self, cr, uid, po, context=None):
         ''' purchase.order:edi_export()
         -------------------------------
@@ -374,10 +331,11 @@ class purchase_order(osv.Model):
         # Lookup the sale order
         # ---------------------
         sale_db = self.pool.get('sale.order')
-        sale_order = sale_db.search(cr, uid, [('name','=', po.origin)])
-        if sale_order:
-            sale_order = sale_db.browse(cr, uid, sale_order[0])
-
+        sale_order_name = re.search('SO\d*', po.origin)
+        if sale_order_name:
+            ids = sale_db.search(cr, uid, [('name','=', sale_order_name.group(0))])
+            if ids: 
+                sale_order = sale_db.browse(cr, uid, ids[0])
 
         # Header fields
         # -------------
@@ -419,7 +377,6 @@ class purchase_order(osv.Model):
             # remove shippingAddress fields where value equals False
             edi_doc['shippingAddress'] = { k:v for k, v in edi_doc['shippingAddress'].items() if v }
 
-
         # Line items
         # ----------
         for line in po.order_line:
@@ -438,9 +395,6 @@ class purchase_order(osv.Model):
         # Return the result
         # -----------------
         return edi_doc
-
-
-
 
 
     def edi_import_validator(self, cr, uid, ids, context):
@@ -547,7 +501,6 @@ class purchase_order(osv.Model):
         return True
 
 
-
     def edi_import_thr(self, cr, uid, ids, context):
         ''' purchase.order:edi_import_thr()
         -----------------------------------
@@ -573,7 +526,6 @@ class purchase_order(osv.Model):
         else:
             edi_db.message_post(cr, uid, ids, body='Quotation {!s} converted to a Purchase Order.'.format(name))
             return True
-
 
 
     def process_incoming_thr_document(self, cr, uid, document, context):
@@ -641,7 +593,6 @@ class purchase_order(osv.Model):
         return False
 
 
-
     def auto_confirm_picking(self, cr, uid, picking, data, context):
         vals = {}
         for ship_line in picking.move_lines:
@@ -689,8 +640,6 @@ class purchase_order(osv.Model):
         edi_db.create(cr, uid, values)
 
 
-
-
     def resolve_helpdesk_case(self, cr, uid, document):
 
         helpdesk_db = self.pool.get('crm.helpdesk')
@@ -711,9 +660,4 @@ class purchase_order(osv.Model):
             case = helpdesk_db.browse(cr, uid, case)
 
         return False
-
-
-
-
-
 
